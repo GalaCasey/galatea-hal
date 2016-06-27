@@ -41,7 +41,10 @@ class GalaWit(object):
 
     def interpret(self, msg):
         resp = self.wit_client.message(msg)
-        logger.info("resp {}".format(resp))
+        logger.info("interpret resp {}".format(resp))
         return resp
 
-
+    def converse(self, msg, session, context):
+        resp = self.wit_client.converse(session, msg, context)
+        logger.info("converse resp {}".format(resp))
+        return resp

@@ -8,21 +8,36 @@ from intenthandlers.misc import say_quote
 from intenthandlers.misc import randomize_options
 from intenthandlers.misc import flip_coin
 from intenthandlers.galastats import count_galateans
+from intenthandlers.partial_intents import partial_randomize
 from slack_clients import is_direct_message
 
 
 logger = logging.getLogger(__name__)
+
+
+def start_session(msg_writer, event, wit_entities):
+    sessions[format(event['user'] + event['channel'])] = {}
+    msg_writer.send_message(event['channel'], "Session Started")
 
 # this is a mapping of wit.ai intents to code that will handle those intents
 intents = {
     'movie-quote': (say_quote, 'movie quote'),
     'galatean-count': (count_galateans, 'How many Galateans are in Boston?'),
     'randomize': (randomize_options, 'Decide between burgers and tacos'),
-    'coin-flip': (flip_coin, 'flip a coin')
+    'coin-flip': (flip_coin, 'flip a coin'),
+    'start-session': (start_session, 'Start a Session')
 }
+
+partial_intents = {
+    'partial-randomize': partial_randomize,
+    'partial_randomize': partial_randomize
+}
+# List of user sessions.
+sessions = {}
 
 # List of users for the bot to ignore
 user_ignore_list = ['USLACKBOT']
+
 
 
 class RtmEventHandler(object):
@@ -55,7 +70,6 @@ class RtmEventHandler(object):
             pass
 
     def _handle_message(self, event):
-
         # Event won't have a user if slackbot is unfurling messages for you
         if 'user' not in event:
             return
@@ -78,22 +92,42 @@ class RtmEventHandler(object):
         if event['user'] in user_ignore_list:
             return
 
-        # bot_uid = self.clients.bot_user_id()
+        sessionID = format(event['user']+event['channel'])
+        context = sessions.get(sessionID)
 
-        # Ask wit to interpret the text and send back a list of entities
-        logger.info("Asking wit to interpret| {}".format(msg_txt))
-        wit_resp = self.wit_client.interpret(msg_txt)
+        if context is None:
+            # Ask wit to interpret the text and send back a list of entities
+            logger.info("Asking wit to interpret| {}".format(msg_txt))
+            wit_resp = self.wit_client.interpret(msg_txt)
+            # Find the intent with the highest confidence that met our default threshold
+            intent_entity = get_highest_confidence_entity(wit_resp['entities'], 'intent')
 
-        # Find the intent with the highest confidence that met our default threshold
-        intent_entity = get_highest_confidence_entity(wit_resp['entities'], 'intent')
+            # If we couldn't find an intent entity, let the user know
+            if intent_entity is None:
+                self.msg_writer.write_prompt(channel_id, intents)
+                return
 
-        # If we couldn't find an intent entity, let the user know
-        if intent_entity is None:
-            self.msg_writer.write_prompt(channel_id, intents)
-            return
-
-        intent_value = intent_entity['value']
-        if intent_value in intents:
-            intents[intent_value][0](self.msg_writer, event, wit_resp['entities'])
+            intent_value = intent_entity['value']
+            if intent_value in intents:
+                intents[intent_value][0](self.msg_writer, event, wit_resp['entities'])
+            else:
+                raise ReferenceError("No function found to handle intent {}".format(intent_value))
         else:
-            raise ReferenceError("No function found to handle intent {}".format(intent_value))
+            # Ask wit to converse-interpret the text and send back a list of entities
+            logger.info("Asking wit to converse-interpret| {}".format(msg_txt))
+            wit_resp = self.wit_client.converse(msg_txt, sessionID, context)
+            if wit_resp.get('confidence') <= .75:
+                self.msg_writer.write_prompt(event['channel'], intents)  # janky for now
+                return
+            if wit_resp.get('type') == 'stop':
+                sessions[event['user']+event['channel']] = None
+                return
+            elif wit_resp.get('type') == 'action':
+                partial_intents[wit_resp.get('action')](self.msg_writer, event, wit_resp)
+            elif wit_resp.get('type') == 'msg':
+                self.msg_writer.send_message(event['channel'], "_{}_".format(wit_resp.get('msg')))
+            else:
+                pass
+
+
+
