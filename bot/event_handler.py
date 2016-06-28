@@ -1,7 +1,7 @@
 import json
 import logging
 
-
+from uuid import uuid4
 from gala_wit import GalaWit
 from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.misc import say_quote
@@ -24,6 +24,10 @@ intents = {
 # List of users for the bot to ignore
 user_ignore_list = ['USLACKBOT']
 
+sessions = {
+    # sample
+    # 'slack_id' : { 'wit_session_id': unique_id, 'context': context}
+}
 
 class RtmEventHandler(object):
     def __init__(self, slack_clients, msg_writer):
@@ -78,22 +82,21 @@ class RtmEventHandler(object):
         if event['user'] in user_ignore_list:
             return
 
-        # bot_uid = self.clients.bot_user_id()
+        # Get our current session, or make a new session
+        slack_session_id = event['user']+channel_id
+        if slack_session_id in sessions:
+            context = sessions[slack_session_id]['context']
+            wit_session_id = sessions[slack_session_id]['wit_id']
+        else:
+            context = {}
+            wit_session_id = uuid4()  # create id gen here
+            sessions[slack_session_id] = {'wit_id': wit_session_id, 'context': context}
 
         # Ask wit to interpret the text and send back a list of entities
-        logger.info("Asking wit to interpret| {}".format(msg_txt))
-        wit_resp = self.wit_client.interpret(msg_txt)
+        logger.info("Asking wit to evaluate| {}".format(msg_txt))
+        context = self.wit_client.evaluate(msg_txt, context, wit_session_id, self.msg_writer, event)
 
-        # Find the intent with the highest confidence that met our default threshold
-        intent_entity = get_highest_confidence_entity(wit_resp['entities'], 'intent')
-
-        # If we couldn't find an intent entity, let the user know
-        if intent_entity is None:
-            self.msg_writer.write_prompt(channel_id, intents)
-            return
-
-        intent_value = intent_entity['value']
-        if intent_value in intents:
-            intents[intent_value][0](self.msg_writer, event, wit_resp['entities'])
+        if context is None:
+            del sessions[slack_session_id]
         else:
-            raise ReferenceError("No function found to handle intent {}".format(intent_value))
+            sessions[slack_session_id][context] = context
