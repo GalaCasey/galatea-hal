@@ -95,7 +95,7 @@ class RtmEventHandler(object):
         # Ask wit to interpret the text and send back a list of entities
         logger.info("Asking wit to evaluate| {}".format(msg_txt))
         context = self.wit_client.evaluate(msg_txt, context, wit_session_id, self.msg_writer, event)
-
+        logger.info("current contexts {}".format(sessions))
         if context is None:
             del sessions[slack_session_id]
         else:

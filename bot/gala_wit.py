@@ -20,10 +20,7 @@ def merge(wit_session_id, context, response):
 
     randomize_option = map(lambda x: x.get('value'), response.get('entities').get('randomize_option'))
     if randomize_option is not None:
-        if len(randomize_option) == 1:
-            context['randomize_option'] = randomize_option[0]
-        else:
-            context['randomize_option'] = randomize_option
+        context['randomize_option'] = randomize_option
 
     return context
 
