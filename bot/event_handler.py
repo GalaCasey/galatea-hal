@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 def start_session(msg_writer, event, wit_entities):
     sessions[format(event['user'] + event['channel'])] = {}
+    logger.info("session started id: {}".format(event['user'] + event['channel']))
     msg_writer.send_message(event['channel'], "Session Started")
 
 # this is a mapping of wit.ai intents to code that will handle those intents
@@ -92,8 +93,8 @@ class RtmEventHandler(object):
         if event['user'] in user_ignore_list:
             return
 
-        sessionID = format(event['user']+event['channel'])
-        context = sessions.get(sessionID)
+        session_id = format(event['user']+event['channel'])
+        context = sessions.get(session_id)
 
         if context is None:
             # Ask wit to interpret the text and send back a list of entities
@@ -115,7 +116,8 @@ class RtmEventHandler(object):
         else:
             # Ask wit to converse-interpret the text and send back a list of entities
             logger.info("Asking wit to converse-interpret| {}".format(msg_txt))
-            wit_resp = self.wit_client.converse(msg_txt, sessionID, context)
+            wit_resp = self.wit_client.converse(msg_txt, session_id, context)
+            logger.info("context is {}".format(context))
             if wit_resp.get('confidence') <= .75:
                 self.msg_writer.write_prompt(event['channel'], intents)  # janky for now
                 return
