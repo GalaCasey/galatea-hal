@@ -15,11 +15,15 @@ intents = {
 }
 
 def merge(wit_session_id, context, response):
-    intent = get_highest_confidence_entity(response.get('entities'), 'intent')
+    intent = get_highest_confidence_entity(response.get('entities'), 'intent')['value']
     if intent is not None: context['intent'] = intent
 
     randomize_option = map(lambda x: x.get('value'), response.get('entities').get('randomize_option'))
-    if randomize_option is not None: context['randomize_option'] = randomize_option
+    if randomize_option is not None:
+        if len(randomize_option) == 1:
+            context['randomize_option'] = randomize_option[0]
+        else:
+            context['randomize_option'] = randomize_option
 
     return context
 
@@ -63,9 +67,12 @@ class GalaWit(object):
     def evaluate(self, msg, context, wit_session_id, msg_writer, event):
         live_context = context
         while True:
-            resp = self.wit_client.converse(wit_session_id, msg, context)
+            if live_context == context:
+                resp = self.wit_client.converse(wit_session_id, msg, live_context)
+            else:
+                resp = self.wit_client.converse(wit_session_id, live_context)
             logger.info("resp is {}".format(resp))
-            if resp.get('confidence') <= 0:
+            if resp.get('confidence') <= 0:  # .75 in prod
                 msg_writer.write_prompt(event['channel'], intents)
                 return None
             elif resp.get('type') == 'stop':
