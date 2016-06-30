@@ -1,5 +1,6 @@
 import json
 import logging
+import zmq
 
 
 from gala_wit import GalaWit
@@ -30,6 +31,7 @@ class RtmEventHandler(object):
         self.clients = slack_clients
         self.msg_writer = msg_writer
         self.wit_client = GalaWit()
+        self.context = zmq.Context()
 
     def handle(self, event):
 
@@ -80,10 +82,15 @@ class RtmEventHandler(object):
 
         # bot_uid = self.clients.bot_user_id()
 
+        socket = self.context.socket(zmq.PUSH)
+        socket.bind("tcp://*:5555")
+
+
         # Ask wit to interpret the text and send back a list of entities
         logger.info("Asking wit to interpret| {}".format(msg_txt))
         wit_resp = self.wit_client.interpret(msg_txt)
-
+        socket.send_string(format(wit_resp))
+        """
         # Find the intent with the highest confidence that met our default threshold
         intent_entity = get_highest_confidence_entity(wit_resp['entities'], 'intent')
 
@@ -97,3 +104,4 @@ class RtmEventHandler(object):
             intents[intent_value][0](self.msg_writer, event, wit_resp['entities'])
         else:
             raise ReferenceError("No function found to handle intent {}".format(intent_value))
+        """
