@@ -7,7 +7,9 @@ from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.misc import say_quote
 from intenthandlers.misc import randomize_options
 from intenthandlers.misc import flip_coin
+from intenthandlers.misc import get_google_drive_list
 from intenthandlers.galastats import count_galateans
+from intenthandlers.misc import view_drive_file
 from slack_clients import is_direct_message
 
 
@@ -18,7 +20,9 @@ intents = {
     'movie-quote': (say_quote, 'movie quote'),
     'galatean-count': (count_galateans, 'How many Galateans are in Boston?'),
     'randomize': (randomize_options, 'Decide between burgers and tacos'),
-    'coin-flip': (flip_coin, 'flip a coin')
+    'coin-flip': (flip_coin, 'flip a coin'),
+    'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
+    'view-drive-file': (view_drive_file, "show getting started")
 }
 
 # List of users for the bot to ignore
