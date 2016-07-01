@@ -90,7 +90,7 @@ def view_drive_file(msg_writer, event, wit_entities):
 
     likely_file = process.extractOne(desired_file_name, file_names)
 
-    if likely_file[1] >= 75:  # Arbitrary probability cutoff
+    if likely_file[1] >= 80:  # Arbitrary probability cutoff
         likely_file_id = get_id_from_name(files, likely_file[0])
         logger.info("file name {}, file id {}".format(likely_file, likely_file_id))
         msg_writer.send_message(event['channel'], "```File ID: {}```".format(likely_file_id))
