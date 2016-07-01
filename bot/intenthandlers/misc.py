@@ -11,7 +11,7 @@ from oauth2client import tools
 
 logger = logging.getLogger(__name__)
 SCOPES = 'https://www.googleapis.com/auth/drive.metadata.readonly'
-KEY_PATH = 'C:/users/jcasey/Documents/sample/sample_key.json'
+KEY_PATH = 'C:/users/jcasey/Documents/sample/sample_key.json'  # hardcoded and bad
 
 try:
     import argparse
@@ -70,10 +70,12 @@ def get_google_drive_list(msg_writer, event, wit_entities):
 
     msg_writer.send_message(event['channel'], message_string)
 
+
 def get_id_from_name(files, file_name):
     for file in files:
         if file['title'] == file_name:
             return file['id']
+
 
 def view_drive_file(msg_writer, event, wit_entities):
     credentials = get_credentials()
