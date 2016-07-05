@@ -4,13 +4,13 @@ import random
 import httplib2
 
 from utils import get_highest_confidence_entity
-from fuzzywuzzy import fuzz, process
+from fuzzywuzzy import process
 from apiclient import discovery
 from oauth2client.service_account import ServiceAccountCredentials
 from oauth2client import tools
 
 logger = logging.getLogger(__name__)
-SCOPES = 'https://www.googleapis.com/auth/drive.metadata.readonly'
+SCOPES = 'https://www.googleapis.com/auth/drive'
 KEY_PATH = 'C:/users/jcasey/Documents/sample/sample_key.json'  # hardcoded and bad
 
 try:
@@ -54,45 +54,83 @@ def get_credentials():
 
 def get_google_drive_list(msg_writer, event, wit_entities):
     credentials = get_credentials()
+
     http = credentials.authorize(httplib2.Http())
-    service = discovery.build('drive', 'v2', http=http)
+    service = discovery.build('drive', 'v3', http=http)
 
-    files = service.files().list().execute()['items']
+    files = service.files().list().execute()['files']
+    if not files:
+        msg_writer.send_message(event['channel'], "No files in this drive")
+    else:
+        file_names = [x['name'] for x in files]  # map(lambda x: x['title'], files)
 
-    file_names = [x['title'] for x in files]  # map(lambda x: x['title'], files)
+        message_string = "```"
 
-    message_string = "```"
+        for file_name in file_names:
+            message_string = message_string + file_name + "\n"
 
-    for file_name in file_names:
-        message_string = message_string + file_name + "\n"
+        message_string += "```"
 
-    message_string += "```"
-
-    msg_writer.send_message(event['channel'], message_string)
+        msg_writer.send_message(event['channel'], message_string)
 
 
 def get_id_from_name(files, file_name):
     for file in files:
-        if file['title'] == file_name:
+        if file['name'] == file_name:
             return file['id']
 
 
 def view_drive_file(msg_writer, event, wit_entities):
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
-    service = discovery.build('drive', 'v2', http=http)
+    service = discovery.build('drive', 'v3', http=http)
 
-    files = service.files().list().execute()['items']
+    files = service.files().list().execute()['files']
 
-    file_names = [x['title'] for x in files]
+    file_names = [x['name'] for x in files]
 
     desired_file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
 
     likely_file = process.extractOne(desired_file_name, file_names)
 
-    if likely_file[1] >= 80:  # Arbitrary probability cutoff
+    if likely_file and likely_file[1] >= 75:  # Arbitrary probability cutoff
         likely_file_id = get_id_from_name(files, likely_file[0])
-        logger.info("file name {}, file id {}".format(likely_file, likely_file_id))
         msg_writer.send_message(event['channel'], "```File ID: {}```".format(likely_file_id))
+
+    else:
+        msg_writer.send_message(event['channel'], "No file found with that name, sorry")
+
+
+def create_drive_file(msg_writer, event, wit_entities):
+    credentials = get_credentials()
+    http = credentials.authorize(httplib2.Http())
+    service = discovery.build('drive', 'v3', http=http)
+
+    desired_file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
+
+    blank_id = service.files().create(body={"name": desired_file_name}).execute()
+
+    if blank_id:
+        msg_writer.send_message(event['channel'], "Created file '{}'".format(desired_file_name))
+    else:
+        msg_writer.write_error(event['channel'], "Failure in file creation")
+
+
+def delete_drive_file(msg_writer, event, wit_entities):
+    credentials = get_credentials()
+    http = credentials.authorize(httplib2.Http())
+    service = discovery.build('drive', 'v3', http=http)
+
+    desired_file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
+    files = service.files().list().execute()['files']
+    file_names = [x['name'] for x in files]
+    likely_file = process.extractOne(desired_file_name, file_names)
+
+    if likely_file and likely_file[1] >= 75:  # Arbitrary probability cutoff
+        file_id = get_id_from_name(files, likely_file[0])
+
+        service.files().delete(fileId=file_id).execute()
+
+        msg_writer.send_message(event['channel'], "{} deleted".format(likely_file[0]))
     else:
         msg_writer.send_message(event['channel'], "No file found with that name, sorry")

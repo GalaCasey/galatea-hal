@@ -10,6 +10,8 @@ from intenthandlers.misc import flip_coin
 from intenthandlers.misc import get_google_drive_list
 from intenthandlers.galastats import count_galateans
 from intenthandlers.misc import view_drive_file
+from intenthandlers.misc import create_drive_file
+from intenthandlers.misc import delete_drive_file
 from slack_clients import is_direct_message
 
 
@@ -22,7 +24,9 @@ intents = {
     'randomize': (randomize_options, 'Decide between burgers and tacos'),
     'coin-flip': (flip_coin, 'flip a coin'),
     'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
-    'view-drive-file': (view_drive_file, "show getting started")
+    'view-drive-file': (view_drive_file, "show getting started"),
+    'create-drive-file': (create_drive_file, "create filename"),
+    'delete-drive-file': (delete_drive_file, "delete filename")
 }
 
 # List of users for the bot to ignore
