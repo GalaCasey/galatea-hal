@@ -12,6 +12,8 @@ from intenthandlers.galastats import count_galateans
 from intenthandlers.misc import view_drive_file
 from intenthandlers.misc import create_drive_file
 from intenthandlers.misc import delete_drive_file
+from intenthandlers.misc import send_email
+from intenthandlers.misc import view_calendar
 from slack_clients import is_direct_message
 
 
@@ -26,7 +28,9 @@ intents = {
     'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
     'view-drive-file': (view_drive_file, "show getting started"),
     'create-drive-file': (create_drive_file, "create filename"),
-    'delete-drive-file': (delete_drive_file, "delete filename")
+    'delete-drive-file': (delete_drive_file, "delete filename"),
+    'send-email': (send_email, "hello person@galatea-associates.com"),
+    ' view-calendar': (view_calendar, "calendar")
 }
 
 # List of users for the bot to ignore

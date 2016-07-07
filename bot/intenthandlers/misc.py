@@ -2,15 +2,19 @@ from __future__ import print_function
 import logging
 import random
 import httplib2
+import datetime
+import requests
+import os
+
 
 from utils import get_highest_confidence_entity
 from fuzzywuzzy import process
-from apiclient import discovery
+from apiclient import discovery, errors
 from oauth2client.service_account import ServiceAccountCredentials
 from oauth2client import tools
 
 logger = logging.getLogger(__name__)
-SCOPES = 'https://www.googleapis.com/auth/drive'
+SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar https://mail.google.com/'
 KEY_PATH = 'C:/users/jcasey/Documents/sample/sample_key.json'  # hardcoded and bad
 
 try:
@@ -129,8 +133,54 @@ def delete_drive_file(msg_writer, event, wit_entities):
     if likely_file and likely_file[1] >= 75:  # Arbitrary probability cutoff
         file_id = get_id_from_name(files, likely_file[0])
 
-        service.files().delete(fileId=file_id).execute()
+        try:
+            service.files().delete(fileId=file_id).execute()
+            msg_writer.send_message(event['channel'], "{} deleted".format(likely_file[0]))
+        except errors.HttpError:
+            msg_writer.send_message(event['channel'], "I can't delete that file")
 
-        msg_writer.send_message(event['channel'], "{} deleted".format(likely_file[0]))
     else:
         msg_writer.send_message(event['channel'], "No file found with that name, sorry")
+
+
+def send_email(msg_writer, event, wit_entities):
+    msg_text = event['text']
+    msg_to = get_highest_confidence_entity(wit_entities, 'email')['value']
+    if not msg_to:
+        msg_writer.send_message(event['channel'], "I can't understand where you want me to send the message, sorry")
+        return
+
+    data = {'function': 'sendMailfromHal', 'to_field': msg_to, 'subject': "Message from Hal", "text_field": msg_text, 'token': "blank"}
+    target_url = os.getenv("SCRIPTS_URL", "")  # env variable probably?
+
+    try:
+        resp = requests.get(target_url, data)
+        if resp.status_code == 200:
+            msg_writer.send_message(event['channel'], "Message Sent")
+            logger.info("message sent")
+            logger.info("resp {}".format(resp.text))
+        else:
+            logger.info("resp {}".format(resp.text))
+            msg_writer.send_message(event['channel'], "Message failed to send")
+
+    except Exception as e:
+        msg_writer.write_error(event['channel'], e)
+        logger.info("contents {}".format(e.content))
+
+
+def view_calendar(msg_writer, event, wit_entities):
+    credentials = get_credentials()
+    http = credentials.authorize(httplib2.Http())
+    service = discovery.build('calendar', 'v3', http=http)
+    now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+    logger.info('Getting the upcoming 10 events')
+    eventsResult = service.events().list(
+        calendarId='primary', timeMin=now, maxResults=10, singleEvents=True,
+        orderBy='startTime').execute()
+    events = eventsResult.get('items', [])
+
+    if not events:
+        msg_writer.send_message(event['channel'], 'No upcoming events found.')
+    for event in events:
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        msg_writer.send_message("".format(start, event['summary']))

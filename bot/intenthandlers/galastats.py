@@ -1,4 +1,7 @@
 import logging
+import json
+import requests
+import os
 from utils import get_highest_confidence_entity
 
 logger = logging.getLogger(__name__)
@@ -43,12 +46,25 @@ def count_galateans(msg_writer, event, wit_entities, ghce=get_highest_confidence
     # Need to use a geocode service for this instead of our hack
     normalized_loc = location_normalization.get(loc, "all")
 
-    txt = ""
-    if normalized_loc == "all":
-        txt = "*Office* : *Count*\n"
-        for o in office_counts:
-            txt = txt + ">" + o + " : " + str(office_counts[o]) + "\n"
+    data = {
+        "token": "blank", #os.getenv("SLACK_TOKEN", ""),
+        "loc": normalized_loc
+    }
+
+    target_url = os.getenv("SCRIPTS_URL", "")
+
+    resp = requests.get(target_url, data)
+    logger.info(resp.text)
+    if resp.status_code == 200:  # could use more error handling in this block
+        txt = ""
+        if normalized_loc == "all":
+            txt = "*Office* : *Count*\n"
+            for o in json.loads(resp.text).get('offices'):
+                txt = txt + ">" + o['name'] + " : " + o['count'] + "\n"
+        else:
+            office = json.loads(resp.text).get('offices')
+            txt = office['name']+" : "+office['count']
     else:
-        txt = loc+" : "+str(office_counts[normalized_loc])
+        txt = "Error in retrieving office counts"
 
     msg_writer.send_message(event['channel'], txt)
