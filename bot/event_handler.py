@@ -33,7 +33,7 @@ class RtmEventHandler(object):
     def __init__(self, slack_clients, msg_writer):
         self.clients = slack_clients
         self.msg_writer = msg_writer
-        self.wit_client = GalaWit()
+        self.wit_client = GalaWit(intents)
 
     def handle(self, event):
 
@@ -95,8 +95,8 @@ class RtmEventHandler(object):
         # Ask wit to interpret the text and send back a list of entities
         logger.info("Asking wit to evaluate| {}".format(msg_txt))
         context = self.wit_client.evaluate(msg_txt, context, wit_session_id, self.msg_writer, event)
-        logger.info("current contexts {}".format(sessions))
+        logger.info("current context {}".format(context))
         if context is None:
             del sessions[slack_session_id]
         else:
-            sessions[slack_session_id][context] = context
+            sessions[slack_session_id]['context'] = context

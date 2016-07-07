@@ -19,13 +19,14 @@ def say_quote(msg_writer, event, wit_entities):
 def randomize_options(msg_writer, event, wit_entities):
     options = wit_entities.get('randomize_option')
     if options is None:  # This will happen when we have a valid randomize intent, but no options
-        msg_writer.send_message(event['channel'], ":face_with_head_bandage: "
+        """msg_writer.send_message(event['channel'], ":face_with_head_bandage: "
                                                   "I know you want to randomize, but I don't know what! \n"
-                                                  " Could you give me a sentence with options?")
-        return
-
-    msg_writer.send_message(event['channel'], "_{}_".format(random.choice(options)['value']))
+                                                  " Could you give me a sentence with options?")"""
+        return {'missingOptions': 'missingOptions'}
+    return {'choice': random.choice(options)['value']}
+    # msg_writer.send_message(event['channel'], "_{}_".format(random.choice(options)['value']))
 
 
 def flip_coin(msg_writer, event, wit_entities):
-    msg_writer.send_message(event['channel'], "_{}_".format(random.choice(['Heads', 'Tails'])))
+    return {'choice': random.choice(['Heads', 'Tails'])}
+    # msg_writer.send_message(event['channel'], "_{}_".format(random.choice(['Heads', 'Tails'])))

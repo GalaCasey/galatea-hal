@@ -2,17 +2,10 @@ import logging
 import os
 from wit import Wit
 from intenthandlers.utils import get_highest_confidence_entity
-from intenthandlers.misc import randomize_options, flip_coin, say_quote
-from intenthandlers.galastats import count_galateans
+
 
 logger = logging.getLogger(__name__)
 
-intents = {
-    'movie-quote': (say_quote, 'movie quote'),
-    'galatean-count': (count_galateans, 'How many Galateans are in Boston?'),
-    'randomize': (randomize_options, 'Decide between burgers and tacos'),
-    'coin-flip': (flip_coin, 'flip a coin')
-}
 
 def merge(wit_session_id, context, response):
     intent = get_highest_confidence_entity(response.get('entities'), 'intent')['value']
@@ -32,14 +25,15 @@ def say(wit_session_id, context, msg, msg_writer, event):
 
 def error(wit_session_id, context, e):
     # Stub implementation
-    raise RuntimeError("Should not have been called. Session: {}. Err   : {}. Context: {}".format(session_id, str(e),
+    raise RuntimeError("Should not have been called. Session: {}. Err   : {}. Context: {}".format(wit_session_id, str(e),
                                                                                                   context))
 
 
 class GalaWit(object):
-    def __init__(self, witlib=Wit):  # Added witlib=Wit to allow test code to send a mock Wit
+    def __init__(self, intents, witlib=Wit):  # Added witlib=Wit to allow test code to send a mock Wit
         wit_token = os.getenv("WIT_ACCESS_TOKEN", "")
         logger.info("wit access token: {}".format(wit_token))
+        self.intents = intents
 
         if wit_token == "":
             logger.error("WIT_ACCESS_TOKEN env var not set.  Will not be able to connect to WIT.ai!")
@@ -63,25 +57,36 @@ class GalaWit(object):
 
     def evaluate(self, msg, context, wit_session_id, msg_writer, event):
         live_context = context
+        end_flag = False
         while True:
-            if live_context == context:
+            if live_context == context:  # Check to se if we are at the start of a conversation
                 resp = self.wit_client.converse(wit_session_id, msg, live_context)
             else:
                 resp = self.wit_client.converse(wit_session_id, live_context)
             logger.info("resp is {}".format(resp))
             if resp.get('confidence') <= 0:  # .75 in prod
-                msg_writer.write_prompt(event['channel'], intents)
+                msg_writer.write_prompt(event['channel'], self.intents)
                 return None
             elif resp.get('type') == 'stop':
-                return live_context
-            elif resp.get('type') == 'say':
+                if end_flag:
+                    return None
+                else:
+                    return live_context
+            elif resp.get('type') == 'msg':
                 live_context = self.actions.get('say')(wit_session_id, context, resp, msg_writer, event)
             elif resp.get('type') == 'merge':
                 live_context = self.actions.get('merge')(wit_session_id, context, resp)
-            else:
+            elif resp.get('type') == 'action':
                 action = resp.get('action')
                 if action is None:
-                    msg_writer.write_prompt(event['channel'], intents)
+                    msg_writer.write_prompt(event['channel'], self.intents)
                     return None
-                logger.info("actions {}".format(self.actions[action]))
-                live_context = self.actions[action](msg_writer, event, resp.get('entities'))
+                if action == 'del-context':
+                    logger.info("Deleting Context")
+                    end_flag = True
+                else:
+                    logger.info("actions {}".format(self.actions[action]))
+                    live_context.update(self.actions[action](msg_writer, event, resp.get('entities')))
+            else:
+                msg_writer.send_message(event['channel'], "Invalid response type in wit conversation")
+                return None
