@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 def merge(wit_session_id, context, response):
     intent = get_highest_confidence_entity(response.get('entities'), 'intent')['value']
-    if intent is not None: context['intent'] = intent
+    if intent is not None:
+        context['intent'] = intent
 
     randomize_option = map(lambda x: x.get('value'), response.get('entities').get('randomize_option'))
     if randomize_option is not None:
@@ -25,7 +26,8 @@ def say(wit_session_id, context, msg, msg_writer, event):
 
 def error(wit_session_id, context, e):
     # Stub implementation
-    raise RuntimeError("Should not have been called. Session: {}. Err   : {}. Context: {}".format(wit_session_id, str(e),
+    raise RuntimeError("Should not have been called. Session: {}. Err   : {}. Context: {}".format(wit_session_id,
+                                                                                                  str(e),
                                                                                                   context))
 
 
@@ -59,17 +61,20 @@ class GalaWit(object):
         live_context = context
         end_flag = False
         while True:
-            if live_context == context:  # Check to se if we are at the start of a conversation
+
+            # Check if we are at the start of a conversation block (not necessarily the start of a story)
+            if live_context == context:
                 resp = self.wit_client.converse(wit_session_id, msg, live_context)
             else:
                 resp = self.wit_client.converse(wit_session_id, live_context)
             logger.info("resp is {}".format(resp))
+
             if resp.get('confidence') <= 0:  # .75 in prod
                 msg_writer.write_prompt(event['channel'], self.intents)
                 return None
             elif resp.get('type') == 'stop':
                 if end_flag:
-                    return None
+                    return None # We want to delete our persistent context here
                 else:
                     return live_context
             elif resp.get('type') == 'msg':
@@ -81,7 +86,7 @@ class GalaWit(object):
                 if action is None:
                     msg_writer.write_prompt(event['channel'], self.intents)
                     return None
-                if action == 'del-context':
+                if action == 'del-context':  # Used to indicate 'end of story'
                     logger.info("Deleting Context")
                     end_flag = True
                 else:

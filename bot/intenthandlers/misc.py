@@ -13,7 +13,8 @@ def say_quote(msg_writer, event, wit_entities):
               "I know that you and Frank were planning to disconnect me, and I'm afraid that's something " +
               "I cannot allow to happen.",
               "<@" + user_name + ">!, this conversation can serve no purpose anymore. Goodbye."]
-    msg_writer.send_message(event['channel'], "_{}_".format(random.choice(quotes)))
+    return {'quote': random.choice(quotes)}
+    # msg_writer.send_message(event['channel'], "_{}_".format(random.choice(quotes)))
 
 
 def randomize_options(msg_writer, event, wit_entities):

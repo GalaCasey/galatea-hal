@@ -29,6 +29,7 @@ sessions = {
     # 'slack_id' : { 'wit_session_id': unique_id, 'context': context}
 }
 
+
 class RtmEventHandler(object):
     def __init__(self, slack_clients, msg_writer):
         self.clients = slack_clients
