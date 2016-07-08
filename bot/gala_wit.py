@@ -4,6 +4,7 @@ from wit import Wit
 
 logger = logging.getLogger(__name__)
 
+
 def merge(session_id, context, entities, msg):
     # Stub implementation
     return context

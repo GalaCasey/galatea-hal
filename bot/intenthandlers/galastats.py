@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 # added ghce=get_highest_confidence_entity to allow for testing with alternate GHCE
-def count_galateans(msg_writer, event, wit_entities, ghce=get_highest_confidence_entity):
+def count_galateans(msg_writer, event, wit_entities, user_name, channel_name, ghce=get_highest_confidence_entity):
 
     # We need to get this from our google apps integration instead of hardcoding
     office_counts = {
@@ -47,8 +47,9 @@ def count_galateans(msg_writer, event, wit_entities, ghce=get_highest_confidence
     normalized_loc = location_normalization.get(loc, "all")
 
     data = {
-        "token": "blank", #os.getenv("SLACK_TOKEN", ""),
-        "loc": normalized_loc
+        "token": os.getenv("GOOGLE_SLACK_TOKEN", ""),
+        "office": normalized_loc,
+        "function": "countGalateans"
     }
 
     target_url = os.getenv("SCRIPTS_URL", "")
@@ -59,11 +60,11 @@ def count_galateans(msg_writer, event, wit_entities, ghce=get_highest_confidence
         txt = ""
         if normalized_loc == "all":
             txt = "*Office* : *Count*\n"
-            for o in json.loads(resp.text).get('offices'):
-                txt = txt + ">" + o['name'] + " : " + o['count'] + "\n"
+            for o in json.loads(resp.text).get('office_counts'):
+                txt = txt + ">" + o['office'] + " : " + str(o['count']) + "\n"
         else:
-            office = json.loads(resp.text).get('offices')
-            txt = office['name']+" : "+office['count']
+            office = json.loads(resp.text).get('office_counts')[0]
+            txt = office['office']+" : "+str(office['count'])
     else:
         txt = "Error in retrieving office counts"
 

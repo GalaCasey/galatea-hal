@@ -11,6 +11,7 @@ from event_handler import RtmEventHandler, intents
 from messenger import Messenger
 from slack_clients import SlackClients
 
+
 def merge(session_id, context, entities, msg):
     # Stub implementation
     return context

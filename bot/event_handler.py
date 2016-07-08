@@ -7,7 +7,7 @@ from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.misc import say_quote
 from intenthandlers.misc import randomize_options
 from intenthandlers.misc import flip_coin
-from intenthandlers.google_actions import count_galateans
+from intenthandlers.galastats import count_galateans
 from intenthandlers.google_actions import view_drive_file
 from intenthandlers.google_actions import create_drive_file
 from intenthandlers.google_actions import delete_drive_file

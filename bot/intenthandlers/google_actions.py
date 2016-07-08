@@ -4,7 +4,9 @@ import requests
 import os
 import logging
 import json
+import binascii
 
+from cryptography.fernet import Fernet
 from utils import get_highest_confidence_entity
 from fuzzywuzzy import process
 from apiclient import discovery, errors
@@ -12,12 +14,19 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 logger = logging.getLogger(__name__)
 
+# These shouldn't be needed anymore
 SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar https://mail.google.com/'
 KEY_PATH = 'C:/users/jcasey/Documents/sample/sample_key.json'  # hardcoded and bad
 
 
 def get_credentials():
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(KEY_PATH, scopes=SCOPES)
+    credfile = open('credfile', 'rb').read()
+    key = binascii.b2a_base64(os.getenv('FERNET_KEY', ""))
+    logger.info("keyfile {}".format(key))
+    crypt = Fernet(key)
+    raw_string = crypt.decrypt(credfile)
+    cred_json = json.loads(raw_string)
+    credentials = ServiceAccountCredentials.from_json(cred_json)
     return credentials
 
 
@@ -152,10 +161,10 @@ def view_calendar(msg_writer, event, wit_entities, user_name, channel_name):
         start = event['start'].get('dateTime', event['start'].get('date'))
         msg_writer.send_message("".format(start, event['summary']))
 
-
+""" # Used with old scripts
 def count_galateans(msg_writer, event, wit_entities, user_name, channel_name):
     data = {
-        "token": "Q56l96wBPrvxxBBhtBwAsCow",
+        "token": "dummy",
         "user_name": user_name,
         "user_id": event['user'],
         "channel_name": channel_name,
@@ -163,7 +172,7 @@ def count_galateans(msg_writer, event, wit_entities, user_name, channel_name):
         "text": "count of Galateans",
         "action": "hal"
     }
-    target_url = "https://script.google.com/macros/s/AKfycbwTQIDhsDf0a6Bx_LhiTldOdwXIES8-R9XDYLA7VRmB05uNpSQ/exec"
+    target_url = "dummy"
 
     resp = requests.get(target_url, data)
     if resp.status_code == 200:
@@ -171,3 +180,4 @@ def count_galateans(msg_writer, event, wit_entities, user_name, channel_name):
         msg_writer.send_message_with_attachments(event['channel'], resp_json['text'], resp_json['attachments'])
     else:
         logger.info("response failed {}".format(resp.text))
+"""

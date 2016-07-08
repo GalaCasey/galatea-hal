@@ -5,6 +5,7 @@ import random
 
 logger = logging.getLogger(__name__)
 
+
 def say_quote(msg_writer, event, wit_entities, user_name, channel_name):
     user_name = event['user']
     quotes = ["Affirmative, <@" + user_name + ">!. I read you",
