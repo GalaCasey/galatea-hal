@@ -7,13 +7,13 @@ from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.misc import say_quote
 from intenthandlers.misc import randomize_options
 from intenthandlers.misc import flip_coin
-from intenthandlers.misc import get_google_drive_list
-from intenthandlers.galastats import count_galateans
-from intenthandlers.misc import view_drive_file
-from intenthandlers.misc import create_drive_file
-from intenthandlers.misc import delete_drive_file
-from intenthandlers.misc import send_email
-from intenthandlers.misc import view_calendar
+from intenthandlers.google_actions import count_galateans
+from intenthandlers.google_actions import view_drive_file
+from intenthandlers.google_actions import create_drive_file
+from intenthandlers.google_actions import delete_drive_file
+from intenthandlers.google_actions import send_email
+from intenthandlers.google_actions import view_calendar
+from intenthandlers.google_actions import get_google_drive_list
 from slack_clients import is_direct_message
 
 
@@ -96,6 +96,14 @@ class RtmEventHandler(object):
         logger.info("Asking wit to interpret| {}".format(msg_txt))
         wit_resp = self.wit_client.interpret(msg_txt)
 
+        user_name = self.clients.get_user_name_from_id(event['user'])
+        logger.info("user name is {}".format(user_name))
+        if is_direct_message(channel_id):
+            channel_name = "Direct Message"
+        else:
+            channel_name = self.clients.get_channel_name_from_id(channel_id)
+        logger.info("channel name is {}".format(channel_name))
+
         # Find the intent with the highest confidence that met our default threshold
         intent_entity = get_highest_confidence_entity(wit_resp['entities'], 'intent')
 
@@ -106,6 +114,6 @@ class RtmEventHandler(object):
 
         intent_value = intent_entity['value']
         if intent_value in intents:
-            intents[intent_value][0](self.msg_writer, event, wit_resp['entities'])
+            intents[intent_value][0](self.msg_writer, event, wit_resp['entities'], user_name, channel_name)
         else:
             raise ReferenceError("No function found to handle intent {}".format(intent_value))

@@ -1,7 +1,8 @@
-
+import requests
 import logging
 import re
 import time
+import json
 
 from slacker import Slacker
 from slackclient import SlackClient
@@ -46,3 +47,27 @@ class SlackClients(object):
         user_typing_json = {"type": "typing", "channel": channel_id}
         self.rtm.server.send_to_websocket(user_typing_json)
         time.sleep(sleep_time)
+
+    def get_user_name_from_id(self, user_id):
+        data = {"token": self.token, "user": user_id}
+        target_url = "https://slack.com/api/users.info"
+        resp = requests.get(target_url,data)
+        if resp.status_code == 200:
+            resp_json = json.loads(resp.text)
+            user_name = resp_json['user']['real_name']
+            return user_name
+        else:
+            logger.info("username request failed")
+            return "username request failed"
+
+    def get_channel_name_from_id(self, channel_id):
+        data = {"token": self.token, "channel": channel_id}
+        target_url = "https://slack.com/api/channels.info"
+        resp = requests.get(target_url, data)
+        if resp.status_code == 200:
+            resp_json = json.loads(resp.text)
+            channel_name = resp_json['channel']['name']
+            return channel_name
+        else:
+            logger.info("channel name request failed")
+            return "channel name request failed"

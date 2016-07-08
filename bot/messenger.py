@@ -1,5 +1,7 @@
 import logging
 import random
+import requests
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -7,6 +9,21 @@ logger = logging.getLogger(__name__)
 class Messenger(object):
     def __init__(self, slack_clients):
         self.clients = slack_clients
+
+    def send_message_with_attachments(self, channel_id, msg, attachments):
+        # in the case of Group and Private channels, RTM channel payload is a complex dictionary
+        if isinstance(channel_id, dict):
+            channel_id = channel_id['id']
+        logger.debug('Sending msg: {} to channel: {}'.format(msg, channel_id))
+        data = {
+            "token": self.clients.token,
+            "channel": channel_id,
+            "text": msg,
+            "attachments": json.dumps(attachments),
+            "as_user": "true"
+        }
+        target_url = "https://slack.com/api/chat.postMessage"
+        requests.get(target_url, data)
 
     def send_message(self, channel_id, msg):
         # in the case of Group and Private channels, RTM channel payload is a complex dictionary
