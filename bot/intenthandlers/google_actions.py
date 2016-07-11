@@ -22,10 +22,16 @@ def get_credentials():
     # The following two lines are used to typecast the string env variable to a base64 accepted by Fernet
     b_key = base64.urlsafe_b64decode(os.getenv('FERNET_KEY', ""))
     key = base64.urlsafe_b64encode(b_key)
+    try:
+        crypt = Fernet(key)
+    except ValueError:
+        return None
 
-    logger.info("keyfile {}".format(key))
-    crypt = Fernet(key)
-    raw_string = crypt.decrypt(credfile)
+    try:
+        raw_string = crypt.decrypt(credfile)
+    except:
+        return None
+
     cred_json = json.loads(raw_string)
     credentials = ServiceAccountCredentials.from_json(cred_json)
     return credentials
@@ -34,7 +40,9 @@ def get_credentials():
 # Note: All drive interaction functions interact with the service account drive at this time
 def get_google_drive_list(msg_writer, event, wit_entities, user_name, channel_name):
     credentials = get_credentials()
-
+    if credentials is None:
+        msg_writer.send_message(event['channel'], "Invalid decryption key")
+        return
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
@@ -62,6 +70,9 @@ def get_id_from_name(files, file_name):
 
 def view_drive_file(msg_writer, event, wit_entities, user_name, channel_name):
     credentials = get_credentials()
+    if credentials is None:
+        msg_writer.send_message(event['channel'], "Invalid decryption key")
+        return
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
@@ -83,6 +94,9 @@ def view_drive_file(msg_writer, event, wit_entities, user_name, channel_name):
 
 def create_drive_file(msg_writer, event, wit_entities, user_name, channel_name):
     credentials = get_credentials()
+    if credentials is None:
+        msg_writer.send_message(event['channel'], "Invalid decryption key")
+        return
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
@@ -98,6 +112,9 @@ def create_drive_file(msg_writer, event, wit_entities, user_name, channel_name):
 
 def delete_drive_file(msg_writer, event, wit_entities, user_name, channel_name):
     credentials = get_credentials()
+    if credentials is None:
+        msg_writer.send_message(event['channel'], "Invalid decryption key")
+        return
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
@@ -154,6 +171,9 @@ def send_email(msg_writer, event, wit_entities, user_name, channel_name):
 # Valid, but examines the calendar of the service account
 def view_calendar(msg_writer, event, wit_entities, user_name, channel_name):
     credentials = get_credentials()
+    if credentials is None:
+        msg_writer.send_message(event['channel'], "Invalid decryption key")
+        return
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
     now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time

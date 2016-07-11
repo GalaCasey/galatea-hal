@@ -50,7 +50,7 @@ class RtmEventHandler(object):
 
     def _handle_by_type(self, event_type, event):
         # See https://api.slack.com/rtm for a full list of events
-        logger.info("event type is {}".format(event_type))
+        # logger.info("event type is {}".format(event_type))
         if event_type == 'error':
             # error
             self.msg_writer.write_error(event['channel'], json.dumps(event))
