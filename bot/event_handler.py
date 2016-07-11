@@ -12,7 +12,7 @@ from intenthandlers.google_actions import view_drive_file
 from intenthandlers.google_actions import create_drive_file
 from intenthandlers.google_actions import delete_drive_file
 from intenthandlers.google_actions import send_email
-from intenthandlers.google_actions import view_calendar
+# from intenthandlers.google_actions import view_calendar
 from intenthandlers.google_actions import get_google_drive_list
 from slack_clients import is_direct_message
 
@@ -30,7 +30,7 @@ intents = {
     'create-drive-file': (create_drive_file, "create filename"),
     'delete-drive-file': (delete_drive_file, "delete filename"),
     'send-email': (send_email, "hello person@galatea-associates.com"),
-    ' view-calendar': (view_calendar, "calendar")
+    # ' view-calendar': (view_calendar, "calendar") Not currently very functional
 }
 
 # List of users for the bot to ignore
@@ -50,7 +50,7 @@ class RtmEventHandler(object):
 
     def _handle_by_type(self, event_type, event):
         # See https://api.slack.com/rtm for a full list of events
-        # logger.info("event type is {}".format(event_type))
+        logger.info("event type is {}".format(event_type))
         if event_type == 'error':
             # error
             self.msg_writer.write_error(event['channel'], json.dumps(event))
