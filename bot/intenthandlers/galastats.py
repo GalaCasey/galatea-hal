@@ -10,13 +10,6 @@ logger = logging.getLogger(__name__)
 # added ghce=get_highest_confidence_entity to allow for testing with alternate GHCE
 def count_galateans(msg_writer, event, wit_entities, user_name, channel_name, ghce=get_highest_confidence_entity):
 
-    # We need to get this from our google apps integration instead of hardcoding
-    office_counts = {
-        'MA': 44,
-        'LN': 9,
-        'FL': 4,
-    }
-
     # We need to find a geocoding service for this so we don't need to hardcode
     location_normalization = {
         "london": "LN",
@@ -49,7 +42,7 @@ def count_galateans(msg_writer, event, wit_entities, user_name, channel_name, gh
     data = {
         "token": os.getenv("GOOGLE_SLACK_TOKEN", ""),
         "office": normalized_loc,
-        "function": "countGalateans"
+        "function": "count_galateans"
     }
 
     target_url = os.getenv("SCRIPTS_URL", "")

@@ -51,7 +51,7 @@ class SlackClients(object):
     def get_user_name_from_id(self, user_id):
         data = {"token": self.token, "user": user_id}
         target_url = "https://slack.com/api/users.info"
-        resp = requests.get(target_url,data)
+        resp = requests.get(target_url, data)
         if resp.status_code == 200:
             resp_json = json.loads(resp.text)
             user_name = resp_json['user']['real_name']

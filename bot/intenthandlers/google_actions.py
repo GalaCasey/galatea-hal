@@ -4,7 +4,8 @@ import requests
 import os
 import logging
 import json
-import binascii
+import base64
+import re
 
 from cryptography.fernet import Fernet
 from utils import get_highest_confidence_entity
@@ -12,16 +13,16 @@ from fuzzywuzzy import process
 from apiclient import discovery, errors
 from oauth2client.service_account import ServiceAccountCredentials
 
-logger = logging.getLogger(__name__)
 
-# These shouldn't be needed anymore
-SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar https://mail.google.com/'
-KEY_PATH = 'C:/users/jcasey/Documents/sample/sample_key.json'  # hardcoded and bad
+logger = logging.getLogger(__name__)
 
 
 def get_credentials():
     credfile = open('credfile', 'rb').read()
-    key = binascii.b2a_base64(os.getenv('FERNET_KEY', ""))
+    # The following two lines are used to typecast the string env variable to a base64 accepted by Fernet
+    b_key = base64.urlsafe_b64decode(os.getenv('FERNET_KEY', ""))
+    key = base64.urlsafe_b64encode(b_key)
+
     logger.info("keyfile {}".format(key))
     crypt = Fernet(key)
     raw_string = crypt.decrypt(credfile)
@@ -120,12 +121,19 @@ def delete_drive_file(msg_writer, event, wit_entities, user_name, channel_name):
 
 def send_email(msg_writer, event, wit_entities, user_name, channel_name):
     msg_text = event['text']
+    email_string = "<mailto:.*@.*\..*\|.*@.*\..*>"  # matches <mailto:example@sample.com|example@sample.com>
+    string_cleaner = re.compile(email_string)
+    cleaned_msg_text = string_cleaner.sub("", msg_text)
     msg_to = get_highest_confidence_entity(wit_entities, 'email')['value']
     if not msg_to:
         msg_writer.send_message(event['channel'], "I can't understand where you want me to send the message, sorry")
         return
 
-    data = {'function': 'sendMailfromHal', 'to_field': msg_to, 'subject': "Message from Hal", "text_field": msg_text, 'token': "blank"}
+    data = {
+        'function': 'send_mail_from_hal',
+        'to_field': msg_to, 'subject': "Message from Hal",
+        "text_field": cleaned_msg_text, 'token': os.getenv("GOOGLE_SLACK_TOKEN", "")
+    }
     target_url = os.getenv("SCRIPTS_URL", "")
 
     try:
