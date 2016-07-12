@@ -44,5 +44,3 @@ class GalaWit(object):
         resp = self.wit_client.message(msg)
         logger.info("resp {}".format(resp))
         return resp
-
-

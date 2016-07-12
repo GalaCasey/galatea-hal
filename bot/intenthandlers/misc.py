@@ -6,7 +6,7 @@ import random
 logger = logging.getLogger(__name__)
 
 
-def say_quote(msg_writer, event, wit_entities, user_name, channel_name):
+def say_quote(msg_writer, event, wit_entities):
     user_name = event['user']
     quotes = ["Affirmative, <@" + user_name + ">!. I read you",
               "I'm sorry, <@" + user_name + ">!. I'm afraid I can't do that",
@@ -18,7 +18,7 @@ def say_quote(msg_writer, event, wit_entities, user_name, channel_name):
     msg_writer.send_message(event['channel'], "_{}_".format(random.choice(quotes)))
 
 
-def randomize_options(msg_writer, event, wit_entities, user_name, channel_name):
+def randomize_options(msg_writer, event, wit_entities):
     options = wit_entities.get('randomize_option')
     if options is None:  # This will happen when we have a valid randomize intent, but no options
         msg_writer.send_message(event['channel'], ":face_with_head_bandage: "
@@ -29,7 +29,7 @@ def randomize_options(msg_writer, event, wit_entities, user_name, channel_name):
     msg_writer.send_message(event['channel'], "_{}_".format(random.choice(options)['value']))
 
 
-def flip_coin(msg_writer, event, wit_entities, user_name, channel_name):
+def flip_coin(msg_writer, event, wit_entities):
     msg_writer.send_message(event['channel'], "_{}_".format(random.choice(['Heads', 'Tails'])))
 
 

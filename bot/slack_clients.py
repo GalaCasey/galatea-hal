@@ -4,6 +4,7 @@ import re
 import time
 import json
 
+from intenthandlers.utils import memoized
 from slacker import Slacker
 from slackclient import SlackClient
 
@@ -17,6 +18,16 @@ def is_direct_message(channel_id):
 class SlackClients(object):
     def __init__(self, token):
         self.token = token
+
+        data = {"token": self.token}
+        target_url = "https://slack.com/api/users.list"
+        resp = requests.get(target_url, data)
+        if resp.status_code == 200:
+            resp_json = json.loads(resp.text)
+            self.users = resp_json['members']
+        else:
+            self.users = []
+            logger.error("Failed to get user list")
 
         # Slacker is a Slack Web API Client
         self.web = Slacker(token)
@@ -48,26 +59,34 @@ class SlackClients(object):
         self.rtm.server.send_to_websocket(user_typing_json)
         time.sleep(sleep_time)
 
+    @memoized
     def get_user_name_from_id(self, user_id):
+        for user in self.users:
+            if user['id'] == user_id:
+                return user
+
+        # Called when user is not found in self.users
         data = {"token": self.token, "user": user_id}
         target_url = "https://slack.com/api/users.info"
         resp = requests.get(target_url, data)
         if resp.status_code == 200:
             resp_json = json.loads(resp.text)
-            user_name = resp_json['user']['real_name']
-            return user_name
+            user = resp_json['user']
+            self.users.append(user)
+            return user
         else:
-            logger.info("username request failed")
+            logger.error("username request failed")
             return "username request failed"
 
+    @memoized
     def get_channel_name_from_id(self, channel_id):
         data = {"token": self.token, "channel": channel_id}
         target_url = "https://slack.com/api/channels.info"
         resp = requests.get(target_url, data)
         if resp.status_code == 200:
             resp_json = json.loads(resp.text)
-            channel_name = resp_json['channel']['name']
-            return channel_name
+            channel = resp_json['channel']
+            return channel
         else:
             logger.info("channel name request failed")
             return "channel name request failed"

@@ -7,22 +7,22 @@ from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.misc import say_quote
 from intenthandlers.misc import randomize_options
 from intenthandlers.misc import flip_coin
-from intenthandlers.galastats import count_galateans
-from intenthandlers.google_actions import view_drive_file
-from intenthandlers.google_actions import create_drive_file
-from intenthandlers.google_actions import delete_drive_file
-from intenthandlers.google_actions import send_email
-# from intenthandlers.google_actions import view_calendar
-from intenthandlers.google_actions import get_google_drive_list
+from intenthandlers.galastats import GalateanStore
+from intenthandlers.drive import view_drive_file
+from intenthandlers.drive import create_drive_file
+from intenthandlers.drive import delete_drive_file
+# from intenthandlers.google_actions import send_email
+from intenthandlers.drive import get_google_drive_list
 from slack_clients import is_direct_message
 
 
 logger = logging.getLogger(__name__)
 
 # this is a mapping of wit.ai intents to code that will handle those intents
+"""
 intents = {
     'movie-quote': (say_quote, 'movie quote'),
-    'galatean-count': (count_galateans, 'How many Galateans are in Boston?'),
+    'galatean-count': (self.gala_store.count_galateans, 'How many Galateans are in Boston?'),
     'randomize': (randomize_options, 'Decide between burgers and tacos'),
     'coin-flip': (flip_coin, 'flip a coin'),
     'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
@@ -31,7 +31,7 @@ intents = {
     'delete-drive-file': (delete_drive_file, "delete filename"),
     'send-email': (send_email, "hello person@galatea-associates.com"),
     # ' view-calendar': (view_calendar, "calendar") Not currently very functional
-}
+}"""
 
 # List of users for the bot to ignore
 user_ignore_list = ['USLACKBOT']
@@ -42,6 +42,18 @@ class RtmEventHandler(object):
         self.clients = slack_clients
         self.msg_writer = msg_writer
         self.wit_client = GalaWit()
+        self.gala_store = None
+        self.intents = {
+            'movie-quote': (say_quote, 'movie quote'),
+            'galatean-count': (self._count_galateans, 'How many Galateans are in Boston?'),
+            'randomize': (randomize_options, 'Decide between burgers and tacos'),
+            'coin-flip': (flip_coin, 'flip a coin'),
+            'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
+            'view-drive-file': (view_drive_file, "show getting started"),
+            'create-drive-file': (create_drive_file, "create filename"),
+            'delete-drive-file': (delete_drive_file, "delete filename"),
+            # 'send-email': (send_email, "hello person@galatea-associates.com"),
+        }
 
     def handle(self, event):
 
@@ -97,23 +109,35 @@ class RtmEventHandler(object):
         wit_resp = self.wit_client.interpret(msg_txt)
 
         user_name = self.clients.get_user_name_from_id(event['user'])
-        logger.info("user name is {}".format(user_name))
         if is_direct_message(channel_id):
             channel_name = "Direct Message"
         else:
             channel_name = self.clients.get_channel_name_from_id(channel_id)
-        logger.info("channel name is {}".format(channel_name))
-
+        event.update({"user_name": user_name, "channel_name": channel_name})
         # Find the intent with the highest confidence that met our default threshold
+        self._initialize_galastats(event)
+
         intent_entity = get_highest_confidence_entity(wit_resp['entities'], 'intent')
 
         # If we couldn't find an intent entity, let the user know
         if intent_entity is None:
-            self.msg_writer.write_prompt(channel_id, intents)
+            self.msg_writer.write_prompt(channel_id, self.intents)
             return
 
         intent_value = intent_entity['value']
-        if intent_value in intents:
-            intents[intent_value][0](self.msg_writer, event, wit_resp['entities'], user_name, channel_name)
+        if intent_value in self.intents:
+            self.intents[intent_value][0](self.msg_writer, event, wit_resp['entities'])
         else:
             raise ReferenceError("No function found to handle intent {}".format(intent_value))
+
+    # Initializes galastats upon the first user message event
+    def _initialize_galastats(self, event):
+        if self.gala_store is not None:
+            pass
+        else:
+            self.gala_store = GalateanStore(event)
+
+    # Wrapper function to handle the fact that gala_store can't be initialized until the first
+    # user message event.
+    def _count_galateans(self, msg_writer, event, wit_resp):
+        return self.gala_store.count_galateans(msg_writer, event, wit_resp)
