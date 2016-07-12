@@ -41,6 +41,11 @@ def get_google_drive_list(msg_writer, event, wit_entities):
 
         msg_writer.send_message(event['channel'], message_string)
 
+"""
+def get_google_drive_list(msg_writer, event, wit entities):
+    drive_list = google_query("get_drive_list", {"text": "get drive list"}, event)
+    msg_writer.send_message_with_attachments(event['channel'], drive_list.get('text'), drive_list.get('attachments'))
+"""
 
 def get_id_from_name(files, file_name):
     for f in files:
@@ -81,6 +86,12 @@ def view_drive_file(msg_writer, event, wit_entities):
     else:
         msg_writer.send_message(event['channel'], "No file found with that name, sorry")
 
+"""
+def get_drive_file(msg_writer, event, wit entities):
+    file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
+    file_list = google_query("get_drive_file", {"text": "get drive file", "file_name": file_name}, event)
+    msg_writer.send_message_with_attachments(event['channel'], file_list.get('text'), file_list.get('attachments'))
+"""
 
 def create_drive_file(msg_writer, event, wit_entities):
     """
@@ -106,6 +117,12 @@ def create_drive_file(msg_writer, event, wit_entities):
     else:
         msg_writer.write_error(event['channel'], "Failure in file creation")
 
+"""
+def create_drive_file(msg_writer, event, wit entities):
+    file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
+    google_query("create_drive_file", {"text": "create drive file", "file_name": file_name}, event)
+    msg_writer.send_message(event['channel'], "{} created".format(file_mame))
+"""
 
 def delete_drive_file(msg_writer, event, wit_entities):
     """
@@ -143,3 +160,10 @@ def delete_drive_file(msg_writer, event, wit_entities):
 
     else:
         msg_writer.send_message(event['channel'], "No file found with that name, sorry")
+
+"""
+def delete_drive_file(msg_writer, event, wit entities):
+    file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
+    google_query("delete_drive_file", {"text": "delete drive file", "file_name": file_name}, event)
+    msg_writer.send_message(event['channel'], "{} deleted".format(file_mame))
+"""

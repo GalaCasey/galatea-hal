@@ -41,7 +41,8 @@ class GalateanStore(object):
 
         # We need to normalize the location since wit doesn't do that for us
         # Need to use a geocode service for this instead of our hack
-        normalized_loc = location_normalization.get(loc, "all")
+        normalized_loc = location_normalization.get(loc, "all")  # should we return all if we get a valid location,
+                                                                 # but where we have no office?
 
         location_totals = self._get_galateans
 

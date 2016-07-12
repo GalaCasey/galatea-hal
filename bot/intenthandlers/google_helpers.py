@@ -89,16 +89,21 @@ def google_query(function, parameters, event):
     target_url = os.getenv("SCRIPTS_URL", "")
     token = os.getenv("GOOGLE_SLACK_TOKEN", "")
     data = copy.deepcopy(parameters)
+    try:
+        channel_name = event['channel_name']['name']
+    except TypeError:
+        channel_name = event['channel_name']
+
     data.update({
         'function': function,
         'token': token,
-        'user_name': event['user_name'],
+        'user_name': event['user_name']['profile']['real_name'],
         'user_id': event['user'],
-        'channel_name': event['channel_name'],
+        'channel_name': channel_name,
         'channel_id': event['channel'],
         'action': 'hal'
     })
-
+    logger.info("data is {}".format(data))
     resp = requests.get(target_url, data)
 
     if resp.status_code == 200:

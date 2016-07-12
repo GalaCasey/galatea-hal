@@ -1,6 +1,7 @@
 import logging
 import os
 from wit import Wit
+from intenthandlers.utils import memoized
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class GalaWit(object):
 
         self.wit_client = witlib(wit_token, self.actions, logger)
 
+    @memoized  # Not clear this should be memoized.
     def interpret(self, msg):
         resp = self.wit_client.message(msg)
         logger.info("resp {}".format(resp))
