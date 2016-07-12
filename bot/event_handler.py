@@ -36,7 +36,7 @@ intents = {
 # List of users for the bot to ignore
 user_ignore_list = ['USLACKBOT']
 
-conversation_intent_types = []
+conversation_intent_types = ['accounts_setup', 'desk_setup', 'phones_setup', 'email_setup', 'slack_setup']
 
 class RtmEventHandler(object):
     def __init__(self, slack_clients, msg_writer):
@@ -150,7 +150,7 @@ class RtmEventHandler(object):
     def _conversation_match(self, intent, wit_resp, event):
         possible_matches = []
         for conversation in self.conversations:
-            if conversation['waiting_for'] == intent:
+            if intent in conversation['waiting_for']:
                 possible_matches.append(conversation)
         if not possible_matches:
             return
@@ -164,7 +164,9 @@ class RtmEventHandler(object):
         if conversation:
             found = False
             for old_conv in self.conversations:
-                if old_conv['id'] == conversation['id']:
+                if old_conv['waiting_for'] is None: # check to ensure we do not have lingering conversations
+                    self.conversations.remove(old_conv)
+                elif old_conv['id'] == conversation['id']:
                     self.conversations.remove(old_conv)
                     self.conversations.add(conversation)
             if not found:
