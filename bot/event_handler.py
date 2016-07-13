@@ -7,6 +7,7 @@ from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.misc import say_quote
 from intenthandlers.misc import randomize_options
 from intenthandlers.misc import flip_coin
+from intenthandlers.misc import nag_users
 from intenthandlers.galastats import count_galateans
 from intenthandlers.drive import view_drive_file
 from intenthandlers.drive import create_drive_file
@@ -18,52 +19,40 @@ from slack_clients import is_direct_message
 
 logger = logging.getLogger(__name__)
 
-# this is a mapping of wit.ai intents to code that will handle those intents
-"""
-intents = {
-    'movie-quote': (say_quote, 'movie quote'),
-    'galatean-count': (self.gala_store.count_galateans, 'How many Galateans are in Boston?'),
-    'randomize': (randomize_options, 'Decide between burgers and tacos'),
-    'coin-flip': (flip_coin, 'flip a coin'),
-    'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
-    'view-drive-file': (view_drive_file, "show getting started"),
-    'create-drive-file': (create_drive_file, "create filename"),
-    'delete-drive-file': (delete_drive_file, "delete filename"),
-    'send-email': (send_email, "hello person@galatea-associates.com"),
-    # ' view-calendar': (view_calendar, "calendar") Not currently very functional
-}"""
-
 # List of users for the bot to ignore
 user_ignore_list = ['USLACKBOT']
 
+# A list of intents which are part of conversations. Could be merged into intents as a separate entry in the tuple
 conversation_intent_types = [
     'accounts-setup',
     'desk-setup',
     'phones-setup',
     'email-setup',
     'slack-setup',
-    'onboarding-start'
+    'onboarding-start',
+    'nag-users'
 ]
 
-intents = {
-    'movie-quote': (say_quote, 'movie quote'),
-    'galatean-count': (count_galateans, 'How many Galateans are in Boston?'),
-    'randomize': (randomize_options, 'Decide between burgers and tacos'),
-    'coin-flip': (flip_coin, 'flip a coin'),
-    'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
-    'view-drive-file': (view_drive_file, "show getting started"),
-    'create-drive-file': (create_drive_file, "create filename"),
-    'delete-drive-file': (delete_drive_file, "delete filename"),
-    # 'send-email': (send_email, "hello person@galatea-associates.com"),
-}
 
 class RtmEventHandler(object):
     def __init__(self, slack_clients, msg_writer):
         self.clients = slack_clients
         self.msg_writer = msg_writer
         self.wit_client = GalaWit()
-
         self.conversations = set()
+        # this is a mapping of wit.ai intents to code that will handle those intents
+        self.intents = {
+            'movie-quote': (say_quote, 'movie quote'),
+            'galatean-count': (count_galateans, 'How many Galateans are in Boston?'),
+            'randomize': (randomize_options, 'Decide between burgers and tacos'),
+            'coin-flip': (flip_coin, 'flip a coin'),
+            'get-google-drive': (get_google_drive_list, "What is in your google drive?"),
+            'view-drive-file': (view_drive_file, "show getting started"),
+            'create-drive-file': (create_drive_file, "create filename"),
+            'delete-drive-file': (delete_drive_file, "delete filename"),
+            'nag-users': (self.clients.nag_users, "Nag John Casey about hal")
+            # 'send-email': (send_email, "hello person@galatea-associates.com"),
+        }
 
     def handle(self, event):
 
@@ -116,7 +105,7 @@ class RtmEventHandler(object):
 
         # If we couldn't find an intent entity, let the user know
         if intent_entity is None:
-            self.msg_writer.write_prompt(channel_id, intents)
+            self.msg_writer.write_prompt(channel_id, self.intents)
             return
 
         intent_value = intent_entity['value']
@@ -125,8 +114,8 @@ class RtmEventHandler(object):
             if match:
                 event.add({"conversation": match})
 
-        if intent_value in intents:
-            self._conversations_update(intents[intent_value][0](self.msg_writer, event, wit_resp['entities']))
+        if intent_value in self.intents:
+            self._conversations_update(self.intents[intent_value][0](self.msg_writer, event, wit_resp['entities']))
         else:
             raise ReferenceError("No function found to handle intent {}".format(intent_value))
 

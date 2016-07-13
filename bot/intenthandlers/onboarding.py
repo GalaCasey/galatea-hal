@@ -25,7 +25,7 @@ def onboarding_start(msg_writer, event, wit_entities):
 
     conversation = {
         'id': uuid4(),
-        'waiting_for': ['accounts_setup', 'desk_setup', 'phones_setup', 'email_setup', 'slack_setup'],
+        'waiting_for': ['accounts-setup', 'desk-setup', 'phones-setup', 'email-setup', 'slack-setup'],
         'context': {
             'return': {'user': event['user'], 'channel': event['channel']},
             'new_employee_name': new_employee,

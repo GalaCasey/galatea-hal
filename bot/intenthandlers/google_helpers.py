@@ -82,9 +82,6 @@ def google_query(function, parameters, event):
     :param event: Event object containing information about the slack event
     :return: The text of the response provided by google, in json format
     """
-    credentials = get_credentials()
-    if credentials is None:
-        raise InvalidToken
 
     target_url = os.getenv("SCRIPTS_URL", "")
     token = os.getenv("GOOGLE_SLACK_TOKEN", "")

@@ -41,7 +41,7 @@ class GalaWit(object):
 
         self.wit_client = witlib(wit_token, self.actions, logger)
 
-    @memoized  # Not clear this should be memoized.
+    # @memoized  # This can be memoized in a high volume environment to eliminate wit calls with identical messages
     def interpret(self, msg):
         resp = self.wit_client.message(msg)
         logger.info("resp {}".format(resp))

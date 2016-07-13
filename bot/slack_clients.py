@@ -3,7 +3,11 @@ import logging
 import re
 import time
 import json
+import threading
 
+from time import sleep
+from uuid import uuid4
+from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.utils import memoized
 from slacker import Slacker
 from slackclient import SlackClient
@@ -90,3 +94,57 @@ class SlackClients(object):
         else:
             logger.info("channel name request failed")
             return "channel name request failed"
+
+    @memoized
+    def get_dm_id_from_user_id(self, user_id):
+        data = {"token": self.token, "channel": user_id}
+        target_url = "https://slack.com/api/im.open"
+        resp = requests.get(target_url, data)
+        if resp.status_code == 200:
+            resp_json = json.loads(resp.text)
+            dm_id = resp_json['channel']
+            return dm_id
+        else:
+            logger.info("DM ID request failed")
+            return "DM ID request failed"
+
+    # Currently only supports nagging one person
+    # TODO: extend to nagging multiple people or a channel, etc.
+    def nag_users(self, msg_writer, event, wit_entities):
+        user_name_to_nag = get_highest_confidence_entity(wit_entities, 'name')
+        if not user_name_to_nag:
+            msg_writer.send_message(event['channel'], "I don't know who you want me to nag")
+            return
+        nag_subject = get_highest_confidence_entity(wit_entities, 'randomize_option')
+        nagger = event['user_name'].get('real_name')
+        for member in self.users:
+            # This equality might prove buggy. Perhaps some fuzzy matching here to allow for tolerances?
+            if member.get('profile').get('real_name') == user_name_to_nag:
+                dm = self.get_dm_id_from_user_id(member.get('id'))
+                message = "You need to {}. {} said so".format(nag_subject, nagger)
+                msg_writer.send_message(dm, message)
+
+        if not dm:
+            msg_writer.send_message(event['channel'], "I couldn't find anyone with that name to nag")
+            return
+
+
+
+        conversation = {
+            'id': uuid4(),
+            'waiting_for': ['nag-response'],
+            'context': {
+                'return': {'user': event['user'], 'channel': event['channel']},
+                'dm_channel': dm,
+                'reminder thread': thread
+
+            }
+        }
+
+        return conversation
+
+    def _repeat_nag(self, msg_writer, channel, message):
+        sleep(10800)  # 3 hours
+        msg_writer.send_message(channel, message)
+        self._repeat_nag(msg_writer, channel, message)
+

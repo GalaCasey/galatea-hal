@@ -7,11 +7,11 @@ from apiclient import discovery, errors
 
 logger = logging.getLogger(__name__)
 """
+Note: All drive interaction functions interact with the service account drive at this time
 Eventually, all of these functions should use google_query in google helpers
 """
 
 
-# Note: All drive interaction functions interact with the service account drive at this time
 def get_google_drive_list(msg_writer, event, wit_entities):
     """
     :param msg_writer: writer used to write to the slack channel
@@ -46,11 +46,6 @@ def get_google_drive_list(msg_writer, event, wit entities):
     drive_list = google_query("get_drive_list", {"text": "get drive list"}, event)
     msg_writer.send_message_with_attachments(event['channel'], drive_list.get('text'), drive_list.get('attachments'))
 """
-
-def get_id_from_name(files, file_name):
-    for f in files:
-        if f['name'] == file_name:
-            return f['id']
 
 
 def view_drive_file(msg_writer, event, wit_entities):
@@ -93,6 +88,7 @@ def get_drive_file(msg_writer, event, wit entities):
     msg_writer.send_message_with_attachments(event['channel'], file_list.get('text'), file_list.get('attachments'))
 """
 
+
 def create_drive_file(msg_writer, event, wit_entities):
     """
     :param msg_writer: writer used to write to the slack channel
@@ -123,6 +119,7 @@ def create_drive_file(msg_writer, event, wit entities):
     google_query("create_drive_file", {"text": "create drive file", "file_name": file_name}, event)
     msg_writer.send_message(event['channel'], "{} created".format(file_mame))
 """
+
 
 def delete_drive_file(msg_writer, event, wit_entities):
     """
@@ -167,3 +164,9 @@ def delete_drive_file(msg_writer, event, wit entities):
     google_query("delete_drive_file", {"text": "delete drive file", "file_name": file_name}, event)
     msg_writer.send_message(event['channel'], "{} deleted".format(file_mame))
 """
+
+
+def get_id_from_name(files, file_name):
+    for f in files:
+        if f['name'] == file_name:
+            return f['id']

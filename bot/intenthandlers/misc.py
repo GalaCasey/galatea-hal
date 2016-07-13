@@ -33,3 +33,4 @@ def flip_coin(msg_writer, event, wit_entities):
     msg_writer.send_message(event['channel'], "_{}_".format(random.choice(['Heads', 'Tails'])))
 
 
+

@@ -65,16 +65,20 @@ class memoized(object):
 
 
 class CallOnce(object):
+    """Decorator. Caches a functions return value the
+    first time it is called, and always returns that value for
+    every call in the future, irrespective of arguments
+    """
     def __init__(self, func):
         self.func = func
-        self.cache = {}
+        self.cache = None
 
     def __call__(self, *args, **kwargs):
-        if 'return' in self.cache:
-            return self.cache['return']
+        if self.cache:
+            return self.cache
         else:
             value = self.func(*args, **kwargs)
-            self.cache['return'] = value
+            self.cache = value
             return value
 
     def __repr__(self):
