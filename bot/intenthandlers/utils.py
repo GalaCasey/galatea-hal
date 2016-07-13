@@ -64,3 +64,26 @@ class memoized(object):
         return functools.partial(self.__call__, obj)
 
 
+class CallOnce(object):
+    def __init__(self, func):
+        self.func = func
+        self.cache = {}
+
+    def __call__(self, *args, **kwargs):
+        if 'return' in self.cache:
+            return self.cache['return']
+        else:
+            value = self.func(*args, **kwargs)
+            self.cache['return'] = value
+            return value
+
+    def __repr__(self):
+        """Return the function's docstring."""
+        return self.func.__doc__
+
+    def __get__(self, obj, objtype):
+        """Support instance methods."""
+        return functools.partial(self.__call__, obj)
+
+
+

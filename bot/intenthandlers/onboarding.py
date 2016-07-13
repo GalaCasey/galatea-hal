@@ -41,16 +41,24 @@ def accounts_setup(msg_writer, event, wit_entities):
     conversation = event.get('conversation')
     context = conversation.get('context')
     msg_writer.send_message(context.get('return').get('channel'),
-                            "Account for {} setup, with {} info".format(context.get('return'), info))
+                            "Account for {} setup, with {} info".format(context.get('new_employee_name'), info))
     conversation.get('waiting_for').remove('accounts_setup')
+    if conversation.get('waiting_for') is None:
+        email_new_hire(msg_writer, conversation)
+        return None
+    return conversation
 
 
 def desk_setup(msg_writer, event, wit_entities):
     conversation = event.get('conversation')
     context = conversation.get('context')
     msg_writer.send_message(context.get('return').get('channel'),
-                            "Desk for {} setup".format(context.get('return')))
+                            "Desk for {} setup".format(context.get('new_employee_name')))
     conversation.get('waiting_for').remove('desk_setup')
+    if conversation.get('waiting_for') is None:
+        email_new_hire(msg_writer, conversation)
+        return None
+    return conversation
 
 
 def phones_setup(msg_writer, event, wit_entities):
@@ -58,21 +66,44 @@ def phones_setup(msg_writer, event, wit_entities):
     conversation = event.get('conversation')
     context = conversation.get('context')
     msg_writer.send_message(context.get('return').get('channel'),
-                            "Phones for {} setup, with {} number".format(context.get('return'), info))
+                            "Phones for {} setup, with {} number".format(context.get('new_employee_name'), info))
     conversation.get('waiting_for').remove('phones_setup')
+    if conversation.get('waiting_for') is None:
+        email_new_hire(msg_writer, conversation)
+        return None
+    return conversation
 
 
 def email_setup(msg_writer, event, wit_entities):
     conversation = event.get('conversation')
+    email = get_highest_confidence_entity(wit_entities, 'email')
     context = conversation.get('context')
     msg_writer.send_message(context.get('return').get('channel'),
-                            "Email for {} setup".format(context.get('return')))
+                            "Email for {} setup".format(context.get('new_employee_name')))
     conversation.get('waiting_for').remove('email_setup')
+    conversation.get('context').add({'email': email})
+    if conversation.get('waiting_for') is None:
+        email_new_hire(msg_writer, conversation)
+        return None
+    return conversation
 
 
 def slack_setup(msg_writer, event, wit_entities):
     conversation = event.get('conversation')
     context = conversation.get('context')
     msg_writer.send_message(context.get('return').get('channel'),
-                            "Email for {} setup".format(context.get('return')))
+                            "Email for {} setup".format(context.get('new_employee_name')))
     conversation.get('waiting_for').remove('slack_setup')
+    if conversation.get('waiting_for') is None:
+        email_new_hire(msg_writer, conversation)
+        return None
+    return conversation
+
+
+def email_new_hire(msg_writer, conversation):
+    context = conversation.get('context')
+    address = context.get('email')
+    name = context.get('new_employee_name')
+    # do some stuff to send the mail to the new employee
+    msg_writer.send_message(context.get('return').get('channel'),
+                            "Email sent to {}".format(context.get('new_employee_name')))
