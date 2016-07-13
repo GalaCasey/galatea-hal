@@ -3,14 +3,13 @@ import logging
 import re
 import time
 import json
-import threading
 
-from time import sleep
 from uuid import uuid4
 from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.utils import memoized
 from slacker import Slacker
 from slackclient import SlackClient
+from stoppable_thread import StoppableThread
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +96,12 @@ class SlackClients(object):
 
     @memoized
     def get_dm_id_from_user_id(self, user_id):
-        data = {"token": self.token, "channel": user_id}
+        data = {"token": self.token, "user": user_id}
         target_url = "https://slack.com/api/im.open"
         resp = requests.get(target_url, data)
         if resp.status_code == 200:
             resp_json = json.loads(resp.text)
-            dm_id = resp_json['channel']
+            dm_id = resp_json['channel']['id']
             return dm_id
         else:
             logger.info("DM ID request failed")
@@ -111,24 +110,26 @@ class SlackClients(object):
     # Currently only supports nagging one person
     # TODO: extend to nagging multiple people or a channel, etc.
     def nag_users(self, msg_writer, event, wit_entities):
-        user_name_to_nag = get_highest_confidence_entity(wit_entities, 'name')
+        user_name_to_nag = get_highest_confidence_entity(wit_entities, 'name')['value']
         if not user_name_to_nag:
             msg_writer.send_message(event['channel'], "I don't know who you want me to nag")
             return
-        nag_subject = get_highest_confidence_entity(wit_entities, 'randomize_option')
+        nag_subject = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
         nagger = event['user_name'].get('real_name')
+        dm = None
         for member in self.users:
             # This equality might prove buggy. Perhaps some fuzzy matching here to allow for tolerances?
             if member.get('profile').get('real_name') == user_name_to_nag:
                 dm = self.get_dm_id_from_user_id(member.get('id'))
                 message = "You need to {}. {} said so".format(nag_subject, nagger)
-                msg_writer.send_message(dm, message)
 
         if not dm:
-            msg_writer.send_message(event['channel'], "I couldn't find anyone with that name to nag")
+            msg_writer.send_message(event['channel'], "I couldn't find anyone named {} to nag".format(user_name_to_nag))
             return
 
-
+        thread = StoppableThread(msg_writer.send_message, dm, message, delay=30)  # 3 hour delay
+        msg_writer.send_message(event['channel'], "Nagging {}".format(user_name_to_nag))
+        thread.start()
 
         conversation = {
             'id': uuid4(),
@@ -136,15 +137,25 @@ class SlackClients(object):
             'context': {
                 'return': {'user': event['user'], 'channel': event['channel']},
                 'dm_channel': dm,
-                'reminder thread': thread
-
-            }
+                'user_name_to_nag': user_name_to_nag,
+                'nag_subject': nag_subject,
+                'reminder_thread': thread
+            },
+            'done': False
         }
 
         return conversation
 
-    def _repeat_nag(self, msg_writer, channel, message):
-        sleep(10800)  # 3 hours
-        msg_writer.send_message(channel, message)
-        self._repeat_nag(msg_writer, channel, message)
-
+    def nag_response(self, msg_writer, event, wit_entities):
+        conversation = event.get('conversation')
+        if not conversation:
+            msg_writer.send_message(event['channel'],
+                                    "I know you want me to stop nagging you, but I'm not sure what about")
+            return
+        context = conversation.get('context')
+        thread = context.get('reminder_thread')
+        msg_writer.send_message(context['return']['channel'],
+                                "{} completed {}".format(context['user_name_to_nag'], context['nag_subject']))
+        msg_writer.send_message(event['channel'], "Nagging complete")
+        thread.join()  # Kills the nagging cycle
+        return conversation.update({'done': True, 'waiting_for': []})

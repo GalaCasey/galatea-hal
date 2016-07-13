@@ -7,7 +7,8 @@ from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.misc import say_quote
 from intenthandlers.misc import randomize_options
 from intenthandlers.misc import flip_coin
-from intenthandlers.misc import nag_users
+from intenthandlers.conversation_matching import onboarding_conversation_match
+from intenthandlers.conversation_matching import nag_conversation_match
 from intenthandlers.galastats import count_galateans
 from intenthandlers.drive import view_drive_file
 from intenthandlers.drive import create_drive_file
@@ -23,15 +24,16 @@ logger = logging.getLogger(__name__)
 user_ignore_list = ['USLACKBOT']
 
 # A list of intents which are part of conversations. Could be merged into intents as a separate entry in the tuple
-conversation_intent_types = [
-    'accounts-setup',
-    'desk-setup',
-    'phones-setup',
-    'email-setup',
-    'slack-setup',
-    'onboarding-start',
-    'nag-users'
-]
+conversation_intent_types = {
+    'accounts-setup': onboarding_conversation_match,
+    'desk-setup': onboarding_conversation_match,
+    'phones-setup': onboarding_conversation_match,
+    'email-setup': onboarding_conversation_match,
+    'slack-setup': onboarding_conversation_match,
+    'onboarding-start': None,
+    'nag-users': None,
+    'nag-response': nag_conversation_match
+}
 
 
 class RtmEventHandler(object):
@@ -39,7 +41,7 @@ class RtmEventHandler(object):
         self.clients = slack_clients
         self.msg_writer = msg_writer
         self.wit_client = GalaWit()
-        self.conversations = set()
+        self.conversations = []
         # this is a mapping of wit.ai intents to code that will handle those intents
         self.intents = {
             'movie-quote': (say_quote, 'movie quote'),
@@ -50,7 +52,8 @@ class RtmEventHandler(object):
             'view-drive-file': (view_drive_file, "show getting started"),
             'create-drive-file': (create_drive_file, "create filename"),
             'delete-drive-file': (delete_drive_file, "delete filename"),
-            'nag-users': (self.clients.nag_users, "Nag John Casey about hal")
+            'nag-users': (self.clients.nag_users, "Nag John Casey about hal"),
+            'nag-response': (self.clients.nag_response, "I did the task")
             # 'send-email': (send_email, "hello person@galatea-associates.com"),
         }
 
@@ -112,7 +115,7 @@ class RtmEventHandler(object):
         if intent_value in conversation_intent_types:
             match = self._conversation_match(intent_value, wit_resp, event)
             if match:
-                event.add({"conversation": match})
+                event.update({"conversation": match})
 
         if intent_value in self.intents:
             self._conversations_update(self.intents[intent_value][0](self.msg_writer, event, wit_resp['entities']))
@@ -151,18 +154,16 @@ class RtmEventHandler(object):
         elif len(possible_matches) == 1:
             return possible_matches[0]
         else:
-            # do something to account for multiple matches
-            return possible_matches[0]
+            return conversation_intent_types[intent](possible_matches, wit_resp, event)
 
     def _conversations_update(self, conversation):
         if conversation:
             found = False
             for old_conv in self.conversations:
-                if old_conv['waiting_for'] is None: # check to ensure we do not have lingering conversations
+                if old_conv['id'] == conversation['id']:
+                    found = True
                     self.conversations.remove(old_conv)
-                elif old_conv['id'] == conversation['id']:
-                    self.conversations.remove(old_conv)
-                    self.conversations.add(conversation)
+                    if not conversation['done']:
+                        self.conversations.append(conversation)
             if not found:
-                self.conversations.add(conversation)
-
+                self.conversations.append(conversation)

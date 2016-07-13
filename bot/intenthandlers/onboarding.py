@@ -30,7 +30,8 @@ def onboarding_start(msg_writer, event, wit_entities):
             'return': {'user': event['user'], 'channel': event['channel']},
             'new_employee_name': new_employee,
             'start_date': start_date
-        }
+        },
+        'done': False
     }
 
     return conversation
