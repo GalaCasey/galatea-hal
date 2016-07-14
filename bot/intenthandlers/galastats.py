@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 # added ghce=get_highest_confidence_entity to allow for testing with alternate GHCE
-def count_galateans(msg_writer, event, wit_entities, ghce=get_highest_confidence_entity):
+def count_galateans(msg_writer, event, wit_entities, credentials, ghce=get_highest_confidence_entity):
 
     # We need to find a geocoding service for this so we don't need to hardcode
     location_normalization = {

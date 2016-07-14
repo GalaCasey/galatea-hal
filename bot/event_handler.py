@@ -10,12 +10,17 @@ from intenthandlers.misc import flip_coin
 from intenthandlers.conversation_matching import onboarding_conversation_match
 from intenthandlers.conversation_matching import nag_conversation_match
 from intenthandlers.galastats import count_galateans
+from intenthandlers.google_helpers import GoogleCredentials
 from intenthandlers.drive import view_drive_file
 from intenthandlers.drive import create_drive_file
 from intenthandlers.drive import delete_drive_file
 # from intenthandlers.google_actions import send_email
 from intenthandlers.drive import get_google_drive_list
+from state import WaitState
+from state import ConversationState
 from slack_clients import is_direct_message
+from oauth2client import client
+import flask
 
 
 logger = logging.getLogger(__name__)
@@ -35,13 +40,18 @@ conversation_intent_types = {
     'nag-response': nag_conversation_match
 }
 
+app = flask.Flask(__name__)
+SCOPES = ""
+
 
 class RtmEventHandler(object):
     def __init__(self, slack_clients, msg_writer):
         self.clients = slack_clients
         self.msg_writer = msg_writer
         self.wit_client = GalaWit()
-        self.conversations = []
+        self.conversations = {}
+        self.wait_states = {}
+        self.credentials = GoogleCredentials(msg_writer)
         # this is a mapping of wit.ai intents to code that will handle those intents
         self.intents = {
             'movie-quote': (say_quote, 'movie quote'),
@@ -101,7 +111,11 @@ class RtmEventHandler(object):
             channel_name = "Direct Message"
         else:
             channel_name = self.clients.get_channel_name_from_id(channel_id)
-        event.update({"user_name": user_name, "channel_name": channel_name})
+        event.update({
+            "user_name": user_name,
+            "channel_name": channel_name,
+            "user_dm": self.clients.get_dm_id_from_user_id(event['user'])
+        })
 
         # Find the intent with the highest confidence that met our default threshold
         intent_entity = get_highest_confidence_entity(wit_resp['entities'], 'intent')
@@ -118,9 +132,38 @@ class RtmEventHandler(object):
                 event.update({"conversation": match})
 
         if intent_value in self.intents:
-            self._conversations_update(self.intents[intent_value][0](self.msg_writer, event, wit_resp['entities']))
+            # how to pass credentials to functions?
+            self._handle_state_change(self.intents[intent_value][0](self.msg_writer,
+                                                                    event,
+                                                                    wit_resp['entities'],
+                                                                    self.credentials))
         else:
             raise ReferenceError("No function found to handle intent {}".format(intent_value))
+
+    @app.route("/")
+    def _handle_flask_redirect(self):
+        if 'code' not in flask.request.args:
+            # This shouldn't happen
+            pass
+        else:
+            flow = client.flow_from_clientsecrets('client_secrets.json',
+                                                  scope=SCOPES,
+                                                  redirect_uri="https://beepboophq.com/proxy/dummy_id")
+            auth_code = flask.request.args.get('code')
+            state = flask.request.args.get('state')
+            credentials = flow.step2_exchange(auth_code)
+            state_id = self.credentials.add_credential_return_state_id(credentials, state)
+            state = self.wait_states.get(state_id)
+            self._conversations_update(self.intents[state['intent_value']][0](self.msg_writer,
+                                                                              state['event'],
+                                                                              state['wit_entities']))
+            self.wait_states.pop(state_id)
+
+    def _handle_state_change(self, state):
+        if isinstance(state, ConversationState):
+            self._conversations_update(state)
+        elif isinstance(state, WaitState):
+            self.wait_states.update({state.get_id(): state})
 
     def _proof_message(self, event):
         # Event won't have a user if slackbot is unfurling messages for you
@@ -157,13 +200,11 @@ class RtmEventHandler(object):
             return conversation_intent_types[intent](possible_matches, wit_resp, event)
 
     def _conversations_update(self, conversation):
-        if conversation:
-            found = False
-            for old_conv in self.conversations:
-                if old_conv['id'] == conversation['id']:
-                    found = True
-                    self.conversations.remove(old_conv)
-                    if not conversation['done']:
-                        self.conversations.append(conversation)
-            if not found:
-                self.conversations.append(conversation)
+        conv_id = conversation.get_id()
+        if conv_id in self.conversations:
+            if conversation.complete():
+                self.conversations.pop(conv_id)
+            else:
+                self.conversations[conv_id] = conversation
+        else:
+            self.conversations[conv_id] = conversation

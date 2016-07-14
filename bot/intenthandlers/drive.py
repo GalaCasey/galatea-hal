@@ -1,29 +1,28 @@
 import httplib2
 import logging
+from uuid import uuid4
 from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.google_helpers import get_credentials
 from fuzzywuzzy import process
 from apiclient import discovery, errors
+from state import WaitState
 
 logger = logging.getLogger(__name__)
-"""
-Note: All drive interaction functions interact with the service account drive at this time
-Eventually, all of these functions should use google_query in google helpers
-"""
 
 
-def get_google_drive_list(msg_writer, event, wit_entities):
+def get_google_drive_list(msg_writer, event, wit_entities, credentials):
     """
     :param msg_writer: writer used to write to the slack channel
     :param event: slack event object
     :param wit_entities: entity object returned by wit API call
     :return: None, list of drive files is written to slack channel
     """
-    credentials = get_credentials()
-    if credentials is None:
-        msg_writer.send_message(event['channel'], "Invalid decryption key")
-        return
-    http = credentials.authorize(httplib2.Http())
+    state_id = uuid4()
+    current_creds = credentials.get_credential(event, state_id)
+    if current_creds is None:
+        state = WaitState(msg_writer, event, wit_entities, credentials)
+        return state
+    http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
     files = service.files().list().execute()['files']
@@ -41,25 +40,20 @@ def get_google_drive_list(msg_writer, event, wit_entities):
 
         msg_writer.send_message(event['channel'], message_string)
 
-"""
-def get_google_drive_list(msg_writer, event, wit entities):
-    drive_list = google_query("get_drive_list", {"text": "get drive list"}, event)
-    msg_writer.send_message_with_attachments(event['channel'], drive_list.get('text'), drive_list.get('attachments'))
-"""
 
-
-def view_drive_file(msg_writer, event, wit_entities):
+def view_drive_file(msg_writer, event, wit_entities, credentials):
     """
     :param msg_writer: writer used to write to the slack channel
     :param event: slack event object
     :param wit_entities: entity object returned by wit API call
     :return: None, list of drive files with the name specified by wit_entities is written to slack channel
     """
-    credentials = get_credentials()
-    if credentials is None:
-        msg_writer.send_message(event['channel'], "Invalid decryption key")
-        return
-    http = credentials.authorize(httplib2.Http())
+    state_id = uuid4()
+    current_creds = credentials.get_credential(event, state_id)
+    if current_creds is None:
+        state = WaitState(msg_writer, event, wit_entities, credentials)
+        return state
+    http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
     files = service.files().list().execute()['files']
@@ -81,15 +75,8 @@ def view_drive_file(msg_writer, event, wit_entities):
     else:
         msg_writer.send_message(event['channel'], "No file found with that name, sorry")
 
-"""
-def get_drive_file(msg_writer, event, wit entities):
-    file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
-    file_list = google_query("get_drive_file", {"text": "get drive file", "file_name": file_name}, event)
-    msg_writer.send_message_with_attachments(event['channel'], file_list.get('text'), file_list.get('attachments'))
-"""
 
-
-def create_drive_file(msg_writer, event, wit_entities):
+def create_drive_file(msg_writer, event, wit_entities, credentials):
     """
     :param msg_writer: writer used to write to the slack channel
     :param event: slack event object
@@ -97,11 +84,12 @@ def create_drive_file(msg_writer, event, wit_entities):
     :return: None, affirmitive message indicating creation of file with name specified by wit_entities is sent
     to slack channel
     """
-    credentials = get_credentials()
-    if credentials is None:
-        msg_writer.send_message(event['channel'], "Invalid decryption key")
-        return
-    http = credentials.authorize(httplib2.Http())
+    state_id = uuid4()
+    current_creds = credentials.get_credential(event, state_id)
+    if current_creds is None:
+        state = WaitState(msg_writer, event, wit_entities, credentials)
+        return state
+    http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
     desired_file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
@@ -113,27 +101,22 @@ def create_drive_file(msg_writer, event, wit_entities):
     else:
         msg_writer.write_error(event['channel'], "Failure in file creation")
 
-"""
-def create_drive_file(msg_writer, event, wit entities):
-    file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
-    google_query("create_drive_file", {"text": "create drive file", "file_name": file_name}, event)
-    msg_writer.send_message(event['channel'], "{} created".format(file_mame))
-"""
 
-
-def delete_drive_file(msg_writer, event, wit_entities):
+def delete_drive_file(msg_writer, event, wit_entities, credentials):
     """
     :param msg_writer: writer used to write to the slack channel
     :param event: slack event object
     :param wit_entities: entity object returned by wit API call
+    :param credentials GoogleCredentials object used to authorize requests
     :return: None, affirmitive message indicating deletion of file with name specified by wit_entities is sent
     to slack channel
     """
-    credentials = get_credentials()
-    if credentials is None:
-        msg_writer.send_message(event['channel'], "Invalid decryption key")
-        return
-    http = credentials.authorize(httplib2.Http())
+    state_id = uuid4()
+    current_creds = credentials.get_credential(event, state_id)
+    if current_creds is None:
+        state = WaitState(msg_writer, event, wit_entities, credentials)
+        return state
+    http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
 
     try:
@@ -157,13 +140,6 @@ def delete_drive_file(msg_writer, event, wit_entities):
 
     else:
         msg_writer.send_message(event['channel'], "No file found with that name, sorry")
-
-"""
-def delete_drive_file(msg_writer, event, wit entities):
-    file_name = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
-    google_query("delete_drive_file", {"text": "delete drive file", "file_name": file_name}, event)
-    msg_writer.send_message(event['channel'], "{} deleted".format(file_mame))
-"""
 
 
 def get_id_from_name(files, file_name):
