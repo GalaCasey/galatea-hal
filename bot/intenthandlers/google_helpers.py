@@ -4,22 +4,28 @@ import logging
 import json
 import httplib2
 import base64
-# import re
+import re
 import copy
-
+import uuid
+from uuid import uuid4
+from email.mime.text import MIMEText
+from state import WaitState
+from intenthandlers.utils import get_highest_confidence_entity
 from cryptography.fernet import Fernet, InvalidToken
-# from oauth2client.service_account import ServiceAccountCredentials
 from oauth2client import client
 from slack_clients import is_direct_message
+from apiclient import discovery
 
 logger = logging.getLogger(__name__)
 
 SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar https://mail.google.com/' \
          ' https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/spreadsheets'
 
+
 class GoogleCredentials(object):
     def __init__(self, msg_writer):
         self.msg_writer = msg_writer
+        # The following two lines are used to typecast the string env variable to a base64 accepted by Fernet
         b_key = base64.urlsafe_b64decode(os.getenv('FERNET_KEY', ""))
         key = base64.urlsafe_b64encode(b_key)
         logger.info("Fernet Key {}".format(key))
@@ -29,9 +35,6 @@ class GoogleCredentials(object):
             logger.error("Null decryption key given")
         hal_credentials = self._get_hal_credentials()
         self._credentials_dict = {'hal': hal_credentials}
-
-        # The following two lines are used to typecast the string env variable to a base64 accepted by Fernet
-
 
     def _get_hal_credentials(self):
         credfile = open('credfile', 'rb').read()
@@ -49,58 +52,53 @@ class GoogleCredentials(object):
 
     def get_credential(self, event, state_id, user='hal'):
         try:
-            return self._credentials_dict[user]  # how do we want to handle expiry?
+            return self._credentials_dict[user]
         except KeyError:
-            flow = client.flow_from_clientsecrets('client_secrets.json',
+            # create and encrypt state
+            state = {'state_id': str(state_id.hex), 'user_id': user}
+            encrypted_state = self.crypt.encrypt(json.dumps(state).encode('utf-8'))
+
+            # generate flow, and begin auth
+            flow = client.flow_from_clientsecrets('C:/Users/jcasey/Documents/hal-keygen/client_secret.json',
                                                   scope=SCOPES,
-                                                  redirect_uri="https://beepboophq.com/proxy/dummy_id")
-            # where dummy id contains user id,
-            auth_uri = flow.step1_get_authorize_url('state')
+                                                  redirect_uri=os.getenv("CALLBACK_URI", ""))
+            flow.params['access_type'] = 'offline'
+            auth_uri = flow.step1_get_authorize_url(state=encrypted_state)
             if not is_direct_message(event['channel']):
-                self.msg_writer.send_message(event['channel'], "I'll send you the authorization link in a direct message")
+                self.msg_writer.send_message(event['channel'],
+                                             "I'll send you the authorization link in a direct message")
             channel = event['user_dm']
             self.msg_writer.send_message(channel, "Click here to authorize {}".format(auth_uri))
             return None
 
     # This function feels really janky
     def add_credential_return_state_id(self, credentials, state):
+
         try:
-            raw_string = self.crypt.decrypt(state)
+            raw_string = self.crypt.decrypt(state.encode('utf-8'))
         except InvalidToken:
             logger.error("Invalid decryption key given")
             return
 
-        state_json = json.loads(raw_string)
+        state_json = json.loads(raw_string.decode('ascii'))
         user_id = state_json.get('user_id')
         self._credentials_dict.update({user_id: credentials})
 
-        return state_json
+        return uuid.UUID(state_json.get('state_id'))
 
-
-def get_credentials(msg_writer, event):
-    """
-    Generates credentials used to access google services via oauth
-    :return: oauth2client credentials object, unless environment decryption key
-    was invalid, then None
-    """
-    if 'google_credentials' in event and not event['google_credentials'].access_token_expired:
-        return event['google_credentials'].authorize(httplib2.Http())
-    else:
-        flow = client.flow_from_clientsecrets('client_secrets.json',
-                                              scope=SCOPES,
-                                              redirect_uri="https://beepboophq.com/proxy/dummy_id")
-        #where dummy id contains user id,
-        auth_uri = flow.step1_get_authorize_url('state')
-        if not is_direct_message(event['channel']):
-            msg_writer.send_message(event['channel'], "I'll send you the authorization link in a direct message")
-        channel = event['user_dm']
-        msg_writer.send_message(channel, "Click here to authorize {}".format(auth_uri))
-        return {'authorization': 'state'}
 
 # not working when pointed to old scripts
 # uncomment and update when implemented in scripts
-"""
-def send_email(msg_writer, event, wit_entities):
+def send_email(msg_writer, event, wit_entities, credentials):
+    state_id = uuid4()
+    current_creds = credentials.get_credential(event, state_id, user=event['user'])
+    if current_creds is None:
+        state = WaitState(build_uuid=state_id, intent_value='send-email', event=event,
+                          wit_entities=wit_entities, credentials=credentials)
+        return state
+    http = current_creds.authorize(httplib2.Http())
+    service = discovery.build('gmail', 'v1', http=http)
+
     msg_text = event['text']
     email_string = "<mailto:.*@.*\..*\|.*@.*\..*>"  # matches <mailto:example@sample.com|example@sample.com>
     string_cleaner = re.compile(email_string)
@@ -110,28 +108,14 @@ def send_email(msg_writer, event, wit_entities):
         msg_writer.send_message(event['channel'], "I can't understand where you want me to send the message, sorry")
         return
 
-    data = {
-        'function': 'send_mail_from_hal',
-        'to_field': msg_to, 'subject': "Message from Hal",
-        "text_field": cleaned_msg_text,
-        'token': os.getenv("GOOGLE_SLACK_TOKEN", "")
-    }
-    target_url = os.getenv("SCRIPTS_URL", "")
+    message = MIMEText(cleaned_msg_text)
+    message['to'] = msg_to
+    message['from'] = "{}@galatea-associates.com".format(event['user_name']['profile']['last_name'])
+    message['subject'] = "Message via Hal from {}".format(event['user_name']['profile']['real_name'])
 
-    try:
-        resp = requests.get(target_url, data)
-        if resp.status_code == 200:
-            msg_writer.send_message(event['channel'], "Message Sent")
-            logger.info("message sent")
-            logger.info("resp {}".format(resp.text))
-        else:
-            logger.info("resp {}".format(resp.text))
-            msg_writer.send_message(event['channel'], "Message failed to send")
+    message_encoded = {'raw': base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode('utf-8')}
 
-    except Exception as e:
-        msg_writer.write_error(event['channel'], e)
-        logger.info("contents {}".format(e.content))
-"""
+    service.users().messages().send(userId="me", body=message_encoded).execute()
 
 
 def google_query(function, parameters, event):

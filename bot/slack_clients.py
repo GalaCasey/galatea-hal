@@ -4,12 +4,12 @@ import re
 import time
 import json
 
-from uuid import uuid4
 from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.utils import memoized
 from slacker import Slacker
 from slackclient import SlackClient
 from stoppable_thread import StoppableThread
+from state import NaggingConversation
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +117,7 @@ class SlackClients(object):
         nag_subject = get_highest_confidence_entity(wit_entities, 'randomize_option')['value']
         nagger = event['user_name'].get('real_name')
         dm = None
+
         for member in self.users:
             # This equality might prove buggy. Perhaps some fuzzy matching here to allow for tolerances?
             if member.get('profile').get('real_name') == user_name_to_nag:
@@ -127,22 +128,15 @@ class SlackClients(object):
             msg_writer.send_message(event['channel'], "I couldn't find anyone named {} to nag".format(user_name_to_nag))
             return
 
-        thread = StoppableThread(msg_writer.send_message, dm, message, delay=30)  # 3 hour delay
+        thread = StoppableThread(msg_writer.send_message, dm, message, delay=30)  # 30 second delay
         msg_writer.send_message(event['channel'], "Nagging {}".format(user_name_to_nag))
         thread.start()
 
-        conversation = {
-            'id': uuid4(),
-            'waiting_for': ['nag-response'],
-            'context': {
-                'return': {'user': event['user'], 'channel': event['channel']},
-                'dm_channel': dm,
-                'user_name_to_nag': user_name_to_nag,
-                'nag_subject': nag_subject,
-                'reminder_thread': thread
-            },
-            'done': False
-        }
+        conversation = NaggingConversation({'user': event['user'], 'channel': event['channel']},
+                                           dm,
+                                           user_name_to_nag,
+                                           nag_subject,
+                                           thread)
 
         return conversation
 
@@ -152,10 +146,12 @@ class SlackClients(object):
             msg_writer.send_message(event['channel'],
                                     "I know you want me to stop nagging you, but I'm not sure what about")
             return
-        context = conversation.get('context')
+        context = conversation.get_context()
         thread = context.get('reminder_thread')
         msg_writer.send_message(context['return']['channel'],
                                 "{} completed {}".format(context['user_name_to_nag'], context['nag_subject']))
-        msg_writer.send_message(event['channel'], "Nagging complete")
+        msg_writer.send_message(event['channel'], "Nagging about {} complete".format(context['nag_subject']))
         thread.join()  # Kills the nagging cycle
-        return conversation.update({'done': True, 'waiting_for': []})
+        conversation.complete()
+        conversation.remove_from_waiting('nag-response')
+        return conversation

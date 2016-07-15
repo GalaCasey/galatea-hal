@@ -2,7 +2,6 @@ import httplib2
 import logging
 from uuid import uuid4
 from intenthandlers.utils import get_highest_confidence_entity
-from intenthandlers.google_helpers import get_credentials
 from fuzzywuzzy import process
 from apiclient import discovery, errors
 from state import WaitState

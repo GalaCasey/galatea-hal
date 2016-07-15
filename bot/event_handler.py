@@ -1,6 +1,6 @@
 import json
 import logging
-
+import zmq
 
 from gala_wit import GalaWit
 from intenthandlers.utils import get_highest_confidence_entity
@@ -14,13 +14,15 @@ from intenthandlers.google_helpers import GoogleCredentials
 from intenthandlers.drive import view_drive_file
 from intenthandlers.drive import create_drive_file
 from intenthandlers.drive import delete_drive_file
-# from intenthandlers.google_actions import send_email
+from intenthandlers.google_helpers import send_email
 from intenthandlers.drive import get_google_drive_list
 from state import WaitState
 from state import ConversationState
 from slack_clients import is_direct_message
 from oauth2client import client
 import flask
+import os
+from intenthandlers.google_helpers import SCOPES
 
 
 logger = logging.getLogger(__name__)
@@ -40,8 +42,13 @@ conversation_intent_types = {
     'nag-response': nag_conversation_match
 }
 
-app = flask.Flask(__name__)
-SCOPES = ""
+context = zmq.Context()
+
+flask_reciever = context.socket(zmq.PULL)
+flask_reciever.bind("tcp://*:6666")
+
+poller = zmq.Poller()
+poller.register(flask_reciever, zmq.POLLIN)
 
 
 class RtmEventHandler(object):
@@ -63,8 +70,8 @@ class RtmEventHandler(object):
             'create-drive-file': (create_drive_file, "create filename"),
             'delete-drive-file': (delete_drive_file, "delete filename"),
             'nag-users': (self.clients.nag_users, "Nag John Casey about hal"),
-            'nag-response': (self.clients.nag_response, "I did the task")
-            # 'send-email': (send_email, "hello person@galatea-associates.com"),
+            'nag-response': (self.clients.nag_response, "I did the task"),
+            'send-email': (send_email, "hello person@galatea-associates.com"),
         }
 
     def handle(self, event):
@@ -87,6 +94,8 @@ class RtmEventHandler(object):
         elif event_type == 'group_joined':
             # you joined a private group
             self.msg_writer.say_hi(event['channel'], event.get('user', ""))
+        elif event_type == 'pong':
+            self._check_flask()
         else:
             pass
 
@@ -140,23 +149,24 @@ class RtmEventHandler(object):
         else:
             raise ReferenceError("No function found to handle intent {}".format(intent_value))
 
-    @app.route("/")
-    def _handle_flask_redirect(self):
-        if 'code' not in flask.request.args:
-            # This shouldn't happen
-            pass
-        else:
-            flow = client.flow_from_clientsecrets('client_secrets.json',
+    def _check_flask(self):
+        socks = dict(poller.poll(1))
+        if flask_reciever in socks:
+            auth_json = flask_reciever.recv_json()
+
+            auth_code = auth_json.get('auth_code')
+            encrypted_state = auth_json.get('encrypted_state')
+
+            flow = client.flow_from_clientsecrets('C:/Users/jcasey/Documents/hal-keygen/client_secret.json',
                                                   scope=SCOPES,
-                                                  redirect_uri="https://beepboophq.com/proxy/dummy_id")
-            auth_code = flask.request.args.get('code')
-            state = flask.request.args.get('state')
+                                                  redirect_uri=os.getenv("CALLBACK_URI", ""))
             credentials = flow.step2_exchange(auth_code)
-            state_id = self.credentials.add_credential_return_state_id(credentials, state)
+            state_id = self.credentials.add_credential_return_state_id(credentials, encrypted_state)
             state = self.wait_states.get(state_id)
-            self._conversations_update(self.intents[state['intent_value']][0](self.msg_writer,
-                                                                              state['event'],
-                                                                              state['wit_entities']))
+            self._handle_state_change(self.intents[state.get_intent_value()][0](self.msg_writer,
+                                                                                 state.get_event(),
+                                                                                 state.get_wit_entities(),
+                                                                                 state.get_credentials()))
             self.wait_states.pop(state_id)
 
     def _handle_state_change(self, state):
@@ -190,8 +200,8 @@ class RtmEventHandler(object):
     def _conversation_match(self, intent, wit_resp, event):
         possible_matches = []
         for conversation in self.conversations:
-            if intent in conversation['waiting_for']:
-                possible_matches.append(conversation)
+            if intent in self.conversations[conversation].get_waiting_for():
+                possible_matches.append(self.conversations[conversation])
         if not possible_matches:
             return
         elif len(possible_matches) == 1:

@@ -2,6 +2,8 @@
 
 import logging
 import os
+from multiprocessing import Process
+from stoppable_thread import FlaskThread
 
 from beepboop import resourcer
 from beepboop import bot_manager
@@ -30,6 +32,8 @@ def main():
         res = resourcer.Resourcer(botManager)
         res.start()
     else:
+        flask_thread = FlaskThread()
+        flask_thread.start()
         # only want to run a single instance of the bot in dev mode
         bot = SlackBot(slack_token)
         bot.start({})

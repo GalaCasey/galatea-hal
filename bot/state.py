@@ -8,10 +8,10 @@ class State(object):
     def __init__(self, obj=None):
         if obj:
             self.id = obj.get('id')
-            self.complete = obj.get('complete')
+            self.finished = obj.get('finished')
         else:
             self.id = uuid4()
-            self.complete = False
+            self.finished = False
 
     def __cmp__(self, other):
         return self.id == other.id
@@ -26,24 +26,27 @@ class State(object):
         return self.complete
 
     def complete(self):
-        self.complete = True
+        self.finished = True
 
     def objectify(self):
         return {
             'id': self.id,
-            'complete': self.complete
+            'finished': self.finished
         }
 
 
 class WaitState(State):
-    def __init__(self, intent_value=None, event=None, wit_entities=None, credentials=None, obj=None):
+    def __init__(self, build_uuid=None, intent_value=None, event=None, wit_entities=None, credentials=None, obj=None):
         State.__init__(self, obj)
         if obj:
+            self.id = obj.get('id')
             self.intent_value = obj.get('intent_value')
             self.event = obj.get('event')
             self.wit_entities = obj.get('wit_entities')
             self.credentials = obj.get('credentials')
+            self.finished = obj.get('finished')
         else:
+            self.id = build_uuid
             self.intent_value = intent_value
             self.event = event
             self.wit_entities = wit_entities
@@ -55,7 +58,7 @@ class WaitState(State):
     def get_event(self):
         return self.event
 
-    def get_wit_entites(self):
+    def get_wit_entities(self):
         return self.wit_entities
 
     def get_credentials(self):
@@ -73,10 +76,16 @@ class WaitState(State):
 
 
 class ConversationState(State):
-    def __init__(self):
-        State.__init__(self)
-        self.waiting_for = None
-        self.context = None
+    def __init__(self, obj=None):
+        State.__init__(self, obj)
+        if obj:
+            self.id = obj.get('id')
+            self.finished = obj.get('finished')
+            self.waiting_for = obj.get('waiting_for')
+            self.context = obj.get('context')
+        else:
+            self.waiting_for = None
+            self.context = None
 
     def get_waiting_for(self):
         return self.waiting_for
