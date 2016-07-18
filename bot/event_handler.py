@@ -54,7 +54,7 @@ class RtmEventHandler(object):
         self.wit_client = GalaWit()
         self.conversations = {}
         self.wait_states = {}
-        self.credentials = GoogleCredentials(msg_writer)
+        self.credentials = GoogleCredentials(msg_writer, slack_clients)
         # this is a mapping of wit.ai intents to code that will handle those intents
         self.intents = {
             'movie-quote': (say_quote, 'movie quote'),

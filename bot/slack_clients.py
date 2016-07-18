@@ -3,7 +3,7 @@ import logging
 import re
 import time
 import json
-
+import os
 from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.utils import memoized
 from slacker import Slacker
@@ -61,6 +61,14 @@ class SlackClients(object):
         user_typing_json = {"type": "typing", "channel": channel_id}
         self.rtm.server.send_to_websocket(user_typing_json)
         time.sleep(sleep_time)
+
+    @memoized
+    def get_id_from_user_name(self, user_name):
+        for user in self.users:
+            if user_name == user['profile']['real_name']:
+                return user['id']
+
+        raise LookupError
 
     @memoized
     def get_user_name_from_id(self, user_id):

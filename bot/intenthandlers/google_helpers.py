@@ -27,8 +27,10 @@ class GoogleCredentials(object):
     GoogleCredentials creates and holds credential objects used with Google OAuth. In addition, it handles encrypting
     and decrypting state uuids as they are passed through the Google environment
     """
-    def __init__(self, msg_writer):
+    def __init__(self, msg_writer, slack_client):
         self.msg_writer = msg_writer
+        self.slack_client = slack_client
+        self.default_user = os.getenv("DEFAULT_USER", "")
         # The following two lines are used to typecast the string env variable to a base64 accepted by Fernet
         b_key = base64.urlsafe_b64decode(os.getenv('FERNET_KEY', ""))
         key = base64.urlsafe_b64encode(b_key)
@@ -37,27 +39,36 @@ class GoogleCredentials(object):
             self.crypt = Fernet(key)
         except ValueError:
             logger.error("Null decryption key given")
-        hal_credentials = self._get_hal_credentials()
-        self._credentials_dict = {'hal': hal_credentials}
+        default_credentials = self._get_default_credentials()
+        self._credentials_dict = {os.getenv("DEFAULT_USER"): default_credentials}
 
-    def _get_hal_credentials(self):
-        credfile = open('credfile', 'rb').read()
+    def _get_default_credentials(self):
+        if self.default_user != 'hal':
+            user_id = self.slack_client.get_id_from_user_name(self.default_user)
+            user_dm = self.slack_client.get_dm_id_from_user_id(user_id)
 
+        else:
+            credfile = open('credfile', 'rb').read()
+
+            try:
+                raw_string = self.crypt.decrypt(credfile)
+            except InvalidToken:
+                logger.error("Invalid decryption key given")
+                return None
+
+            cred_json = json.loads(raw_string.decode('ascii'))
+            credentials = client.OAuth2Credentials.from_json(cred_json)
+
+            return credentials
+
+    def get_credential(self, event, state_id, user=None):
+        if user is None:
+            user = self.default_user
         try:
-            raw_string = self.crypt.decrypt(credfile)
-        except InvalidToken:
-            logger.error("Invalid decryption key given")
-            return None
-
-        cred_json = json.loads(raw_string.decode('ascii'))
-        credentials = client.OAuth2Credentials.from_json(cred_json)
-
-        return credentials
-
-    def get_credential(self, event, state_id, user='hal'):
-        try:
+            if self._credentials_dict[user].access_token_expired:
+                raise GoogleAccessError
             return self._credentials_dict[user]
-        except KeyError:
+        except KeyError or GoogleAccessError as error:
             # create and encrypt state
             state = {'state_id': str(state_id.hex), 'user_id': user}
             encrypted_state = self.crypt.encrypt(json.dumps(state).encode('utf-8'))
@@ -68,6 +79,8 @@ class GoogleCredentials(object):
                                               scope=SCOPES,
                                               redirect_uri=os.getenv("CALLBACK_URI", ""))
             flow.params['access_type'] = 'offline'
+            if isinstance(error, GoogleAccessError):
+                flow.params['approval_prompt'] = 'force'
             auth_uri = flow.step1_get_authorize_url(state=encrypted_state)
             if not is_direct_message(event['channel']):
                 self.msg_writer.send_message(event['channel'],
