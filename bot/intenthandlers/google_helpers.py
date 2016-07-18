@@ -5,6 +5,8 @@ import httplib2
 import base64
 import re
 import uuid
+import copy
+import requests
 from uuid import uuid4
 from email.mime.text import MIMEText
 from state import WaitState
@@ -126,3 +128,48 @@ def send_email(msg_writer, event, wit_entities, credentials):
 
     service.users().messages().send(userId="me", body=message_encoded).execute()
 
+
+def google_query(function, parameters, event):
+    """
+    :param function: Name of the function to be called in google scripts
+    :param parameters: parameters of the function
+    :param event: Event object containing information about the slack event
+    This function should not be used. Currently used by galastats.py, but that should be upgraded, and this function
+    deleted
+    :return: The text of the response provided by google, in json format
+    """
+
+    target_url = os.getenv("SCRIPTS_URL", "")
+    token = os.getenv("GOOGLE_SLACK_TOKEN", "")
+    data = copy.deepcopy(parameters)
+    try:
+        channel_name = event['channel_name']['name']
+    except TypeError:
+        channel_name = event['channel_name']
+
+    data.update({
+        'function': function,
+        'token': token,
+        'user_name': event['user_name']['profile']['real_name'],
+        'user_id': event['user'],
+        'channel_name': channel_name,
+        'channel_id': event['channel'],
+        'action': 'hal'
+    })
+    logger.info("data is {}".format(data))
+    resp = requests.get(target_url, data)
+
+    if resp.status_code == 200:
+        resp_json = json.loads(resp.text)
+        logger.info("resp text {}, json {}".format(resp.text, resp_json))
+        return resp_json
+    else:
+        raise GoogleAccessError(resp.status_code)
+
+
+class GoogleAccessError(Exception):
+    """
+    error used in google_query. Should be deleted along with google_query
+    """
+    def __init__(self, *error_args):
+        Exception.__init__(self, "Bad response status {}".format(error_args))

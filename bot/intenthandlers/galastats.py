@@ -1,6 +1,6 @@
 import logging
 from intenthandlers.utils import get_highest_confidence_entity, CallOnce
-
+from intenthandlers.google_helpers import google_query
 
 logger = logging.getLogger(__name__)
 
@@ -60,4 +60,5 @@ def count_galateans(msg_writer, event, wit_entities, credentials, ghce=get_highe
 
 @CallOnce
 def get_galateans(event):
+    # This should make an API call.
     return google_query("count_galateans", {'text': "show count of Galateans"}, event)
