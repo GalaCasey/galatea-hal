@@ -5,6 +5,9 @@ logger = logging.getLogger(__name__)
 
 
 class State(object):
+    """
+    A generic object used as a base class for other stateful objects
+    """
     def __init__(self, obj=None):
         if obj:
             self.id = obj.get('id')
@@ -36,6 +39,10 @@ class State(object):
 
 
 class WaitState(State):
+    """
+    A WaitState holds the state of a Hal command, and is used to ensure that once a user is authenticated with
+    OAuth, their original command continues executing
+    """
     def __init__(self, build_uuid=None, intent_value=None, event=None, wit_entities=None, credentials=None, obj=None):
         State.__init__(self, obj)
         if obj:
@@ -76,6 +83,9 @@ class WaitState(State):
 
 
 class ConversationState(State):
+    """
+    A generic conversation state, used as a base for specific conversations
+    """
     def __init__(self, obj=None):
         State.__init__(self, obj)
         if obj:
@@ -110,6 +120,9 @@ class ConversationState(State):
 
 
 class OnboardingConversation(ConversationState):
+    """
+    A Conversation used to keep track of where in the onboarding process this onboarding is.
+    """
     def __init__(self, return_target, new_employee, start_date):
         ConversationState.__init__(self)
         self.waiting_for = ['accounts-setup', 'desk-setup', 'phones-setup', 'email-setup', 'slack-setup']
@@ -121,6 +134,10 @@ class OnboardingConversation(ConversationState):
 
 
 class NaggingConversation(ConversationState):
+    """
+    A Conversation used to keep track of who is currently being nagged, to ensure that when they complete their task,
+    they are no longer nagged.
+    """
     def __init__(self, return_target, dm, user_name_to_nag, nag_subject, thread):
         ConversationState.__init__(self)
         self.waiting_for = ['nag-response']

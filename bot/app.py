@@ -2,8 +2,8 @@
 
 import logging
 import os
-from multiprocessing import Process
-from stoppable_thread import FlaskThread
+import zmq
+from threads import FlaskThread
 
 from beepboop import resourcer
 from beepboop import bot_manager
@@ -20,8 +20,6 @@ def main():
     # Log this at error level even though it's not an error, because we want to be sure the message is seen
     logging.error("logging level: {}".format(log_level))
 
-
-
     slack_token = os.getenv("SLACK_TOKEN", "")
     logging.info("slack token: {}".format(slack_token))
 
@@ -32,10 +30,11 @@ def main():
         res = resourcer.Resourcer(botManager)
         res.start()
     else:
-        flask_thread = FlaskThread()
+        context = zmq.Context()
+        flask_thread = FlaskThread(context)
         flask_thread.start()
         # only want to run a single instance of the bot in dev mode
-        bot = SlackBot(slack_token)
+        bot = SlackBot(context, slack_token)
         bot.start({})
 
 

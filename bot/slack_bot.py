@@ -14,12 +14,13 @@ def spawn_bot():
 
 
 class SlackBot(object):
-    def __init__(self, token=None, slack_clients=SlackClients):  # added slack_clients=SlackClients to allow for mocking
+    def __init__(self, zmq_context, token=None, slack_clients=SlackClients):  # added slack_clients=SlackClients to allow for mocking
         """Creates Slacker Web and RTM clients with API Bot User token.
 
         Args:
             token (str): Slack API Bot User token (for development token set in env)
         """
+        self.zmq_context = zmq_context
         self.last_ping = 0
         self.keep_running = True
         if token is not None:
@@ -45,7 +46,7 @@ class SlackBot(object):
                 self.clients.rtm.server.domain))
 
             msg_writer = messenger(self.clients)
-            event_handler = rtmEventHandler(self.clients, msg_writer)
+            event_handler = rtmEventHandler(self.clients, msg_writer, self.zmq_context)
 
             while self.keep_running:
                 for event in self.clients.rtm.rtm_read():

@@ -19,7 +19,8 @@ def get_google_drive_list(msg_writer, event, wit_entities, credentials):
     state_id = uuid4()
     current_creds = credentials.get_credential(event, state_id)
     if current_creds is None:
-        state = WaitState(msg_writer, event, wit_entities, credentials)
+        state = WaitState(build_uuid=state_id, intent_value='get-google-drive', event=event,
+                          wit_entities=wit_entities, credentials=credentials)
         return state
     http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
@@ -50,7 +51,8 @@ def view_drive_file(msg_writer, event, wit_entities, credentials):
     state_id = uuid4()
     current_creds = credentials.get_credential(event, state_id)
     if current_creds is None:
-        state = WaitState(msg_writer, event, wit_entities, credentials)
+        state = WaitState(build_uuid=state_id, intent_value='view-drive-file', event=event,
+                          wit_entities=wit_entities, credentials=credentials)
         return state
     http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
@@ -86,7 +88,8 @@ def create_drive_file(msg_writer, event, wit_entities, credentials):
     state_id = uuid4()
     current_creds = credentials.get_credential(event, state_id)
     if current_creds is None:
-        state = WaitState(msg_writer, event, wit_entities, credentials)
+        state = WaitState(build_uuid=state_id, intent_value='create-drive-file', event=event,
+                          wit_entities=wit_entities, credentials=credentials)
         return state
     http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)
@@ -113,7 +116,8 @@ def delete_drive_file(msg_writer, event, wit_entities, credentials):
     state_id = uuid4()
     current_creds = credentials.get_credential(event, state_id)
     if current_creds is None:
-        state = WaitState(msg_writer, event, wit_entities, credentials)
+        state = WaitState(build_uuid=state_id, intent_value='delete-drive-file', event=event,
+                          wit_entities=wit_entities, credentials=credentials)
         return state
     http = current_creds.authorize(httplib2.Http())
     service = discovery.build('drive', 'v3', http=http)

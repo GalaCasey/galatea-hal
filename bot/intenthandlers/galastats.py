@@ -1,7 +1,6 @@
 import logging
 from intenthandlers.utils import get_highest_confidence_entity, CallOnce
-from cached_property import cached_property
-from intenthandlers.google_helpers import google_query
+
 
 logger = logging.getLogger(__name__)
 

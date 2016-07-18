@@ -20,7 +20,6 @@ from state import WaitState
 from state import ConversationState
 from slack_clients import is_direct_message
 from oauth2client import client
-import flask
 import os
 from intenthandlers.google_helpers import SCOPES
 
@@ -42,17 +41,14 @@ conversation_intent_types = {
     'nag-response': nag_conversation_match
 }
 
-context = zmq.Context()
-
-flask_reciever = context.socket(zmq.PULL)
-flask_reciever.bind("tcp://*:6666")
-
-poller = zmq.Poller()
-poller.register(flask_reciever, zmq.POLLIN)
-
 
 class RtmEventHandler(object):
-    def __init__(self, slack_clients, msg_writer):
+    def __init__(self, slack_clients, msg_writer, context):
+        self.flask_receiver = context.socket(zmq.PULL)
+        self.flask_receiver.bind("inproc://flask")
+        self.poller = zmq.Poller()
+        self.poller.register(self.flask_receiver, zmq.POLLIN)
+
         self.clients = slack_clients
         self.msg_writer = msg_writer
         self.wit_client = GalaWit()
@@ -95,7 +91,9 @@ class RtmEventHandler(object):
             # you joined a private group
             self.msg_writer.say_hi(event['channel'], event.get('user', ""))
         elif event_type == 'pong':
-            self._check_flask()
+            # I am not certain if there is a better way to do this check
+            if len(self.wait_states) > 0:
+                self._check_flask()
         else:
             pass
 
@@ -123,7 +121,8 @@ class RtmEventHandler(object):
         event.update({
             "user_name": user_name,
             "channel_name": channel_name,
-            "user_dm": self.clients.get_dm_id_from_user_id(event['user'])
+            "user_dm": self.clients.get_dm_id_from_user_id(event['user']),
+            "cleaned_text": msg_txt
         })
 
         # Find the intent with the highest confidence that met our default threshold
@@ -150,32 +149,48 @@ class RtmEventHandler(object):
             raise ReferenceError("No function found to handle intent {}".format(intent_value))
 
     def _check_flask(self):
-        socks = dict(poller.poll(1))
-        if flask_reciever in socks:
-            auth_json = flask_reciever.recv_json()
+        """
+        _check_flask checks to see if there are any messages from the flask thread. If there are, it processes them
+        by finishing the authentication flow, and then resuming the interrupted user command.
+        :return: None
+        """
+        socks = dict(self.poller.poll(1))  # Checks for 1 ms
+        if self.flask_receiver in socks:
+            auth_json = self.flask_receiver.recv_json()
 
             auth_code = auth_json.get('auth_code')
             encrypted_state = auth_json.get('encrypted_state')
 
-            flow = client.flow_from_clientsecrets('C:/Users/jcasey/Documents/hal-keygen/client_secret.json',
-                                                  scope=SCOPES,
-                                                  redirect_uri=os.getenv("CALLBACK_URI", ""))
+            flow = client.OAuth2WebServerFlow(client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
+                                              client_secret=os.getenv("GOOGLE_CLIENT_SECRET", ""),
+                                              scope=SCOPES,
+                                              redirect_uri=os.getenv("CALLBACK_URI", ""))
             credentials = flow.step2_exchange(auth_code)
             state_id = self.credentials.add_credential_return_state_id(credentials, encrypted_state)
             state = self.wait_states.get(state_id)
             self._handle_state_change(self.intents[state.get_intent_value()][0](self.msg_writer,
-                                                                                 state.get_event(),
-                                                                                 state.get_wit_entities(),
-                                                                                 state.get_credentials()))
+                                                                                state.get_event(),
+                                                                                state.get_wit_entities(),
+                                                                                state.get_credentials()))
             self.wait_states.pop(state_id)
 
     def _handle_state_change(self, state):
+        """
+        :param state: The state returned by the intent handling function
+        Updates the state dicts based on they type of the state returned.
+        :return: None
+        """
         if isinstance(state, ConversationState):
             self._conversations_update(state)
         elif isinstance(state, WaitState):
             self.wait_states.update({state.get_id(): state})
 
     def _proof_message(self, event):
+        """
+        :param event: The triggering message event
+        Checks the event to see if this is a message that should be processed
+        :return: Bool indicating whether or not the Rtm should continue processing the message
+        """
         # Event won't have a user if slackbot is unfurling messages for you
         if 'user' not in event:
             return False
@@ -198,6 +213,14 @@ class RtmEventHandler(object):
         return True
 
     def _conversation_match(self, intent, wit_resp, event):
+        """
+        :param intent: The most likely intended intent returned by wit
+        :param wit_resp: The total response from wit
+        :param event: The triggering event
+        _conversation_match attempts to return the conversation connected to the event based on event information and
+        the wit response
+        :return: A Conversation State from self.conversations
+        """
         possible_matches = []
         for conversation in self.conversations:
             if intent in self.conversations[conversation].get_waiting_for():
@@ -207,9 +230,16 @@ class RtmEventHandler(object):
         elif len(possible_matches) == 1:
             return possible_matches[0]
         else:
+            # Not fully implemented, will certainly break if called
             return conversation_intent_types[intent](possible_matches, wit_resp, event)
 
     def _conversations_update(self, conversation):
+        """
+        :param conversation: A Conversation that needs to be updated or added to, or removed from self.conversations
+        _conversations_update adds to, updates, or removes from self.conversations based on the id and the state of the
+        passed conversation
+        :return: None
+        """
         conv_id = conversation.get_id()
         if conv_id in self.conversations:
             if conversation.complete():

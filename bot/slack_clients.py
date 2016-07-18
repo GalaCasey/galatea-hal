@@ -8,7 +8,7 @@ from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.utils import memoized
 from slacker import Slacker
 from slackclient import SlackClient
-from stoppable_thread import StoppableThread
+from threads import StoppableThread
 from state import NaggingConversation
 
 logger = logging.getLogger(__name__)

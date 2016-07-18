@@ -1,7 +1,7 @@
 import logging
 import os
 from wit import Wit
-from intenthandlers.utils import memoized
+# from intenthandlers.utils import memoized
 
 logger = logging.getLogger(__name__)
 
