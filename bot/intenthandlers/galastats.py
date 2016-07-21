@@ -1,4 +1,8 @@
 import logging
+import httplib2
+from uuid import uuid4
+from state import WaitState
+from apiclient import discovery
 from intenthandlers.utils import get_highest_confidence_entity, CallOnce
 from intenthandlers.google_helpers import google_query
 
@@ -37,28 +41,42 @@ def count_galateans(msg_writer, event, wit_entities, credentials, ghce=get_highe
     # Need to use a geocode service for this instead of our hack
     normalized_loc = location_normalization.get(loc, "all")  # should we return all if we get a valid location,
                                                              # but where we have no office?
-
-    location_totals = get_galateans(event)
-
+    state_id = uuid4()
+    current_creds = credentials.get_credential(event, state_id, user=event['user'])
+    if current_creds is None:
+        state = WaitState(build_uuid=state_id, intent_value='galatean-count', event=event,
+                          wit_entities=wit_entities, credentials=credentials)
+        return state
+    location_totals = get_galateans(current_creds)
+    logger.info(location_totals)
+    text = "*Office | Count*"
     if normalized_loc == "all":
-        msg_writer.send_message_with_attachments(event['channel'],
-                                                 location_totals.get('text'),
-                                                 location_totals.get('attachments'))
+        for office in location_totals:
+            text += "\n" + office + "             " + location_totals[office]
     else:
-        full_fields = location_totals.get('attachments')[0].get('fields')
-        partial_fields = [full_fields[0], full_fields[1]]
-        index = 0
-        for f in full_fields:
-            index += 1  # not pythonic, but not sure how else to get the next item
-            if f.get('value') == normalized_loc:
-                partial_fields.append(f)
-                partial_fields.append(full_fields[index])
-        msg_writer.send_message_with_attachments(event['channel'],
-                                                 location_totals.get('text'),
-                                                 [{"fields": partial_fields}])
+        if normalized_loc == "LN":
+            text += "\nLN             " + location_totals['LN']
+        elif normalized_loc == "MA":
+            text += "\nMA             " + location_totals['MA']
+        elif normalized_loc == "FL":
+            text += "\nFL             " + location_totals['FL']
+    msg_writer.send_message(event['channel'], "Count of Galateans\n" + text)
 
 
 @CallOnce
-def get_galateans(event):
+def get_galateans(current_creds):
     # This should make an API call.
-    return google_query("count_galateans", {'text': "show count of Galateans"}, event)
+    http = current_creds.authorize(httplib2.Http())
+    discoveryUrl = ('https://sheets.googleapis.com/$discovery/rest?'
+                    'version=v4')
+    service = discovery.build('sheets', 'v4', http=http, discoveryServiceUrl=discoveryUrl)
+    spreadsheetId = "14Sl7L5r5R1OLX9FmY4yZABsSD4b8GuX0uC8btlSl1cM"
+    rangeName = 'Count by office!Gala_Count'
+    result = service.spreadsheets().values().get(spreadsheetId=spreadsheetId, range=rangeName).execute()
+    values = result.get('values', [])
+    offices = {
+        "LN": values[1][1],
+        "FL": values[0][1],
+        "MA": values[2][1]
+    }
+    return offices

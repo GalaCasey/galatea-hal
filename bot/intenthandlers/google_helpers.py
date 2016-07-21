@@ -30,7 +30,7 @@ class GoogleCredentials(object):
     def __init__(self, msg_writer, slack_client):
         self.msg_writer = msg_writer
         self.slack_client = slack_client
-        self.default_user = os.getenv("DEFAULT_USER", "")
+        self.default_user = slack_client.get_id_from_user_name(os.getenv("DEFAULT_USER", ""))
         # The following two lines are used to typecast the string env variable to a base64 accepted by Fernet
         b_key = base64.urlsafe_b64decode(os.getenv('FERNET_KEY', ""))
         key = base64.urlsafe_b64encode(b_key)
@@ -39,27 +39,22 @@ class GoogleCredentials(object):
             self.crypt = Fernet(key)
         except ValueError:
             logger.error("Null decryption key given")
-        default_credentials = self._get_default_credentials()
-        self._credentials_dict = {os.getenv("DEFAULT_USER"): default_credentials}
-
+        self._credentials_dict = {}
+        # default_credentials = self._get_default_credentials()
+        # self._credentials_dict = {os.getenv("DEFAULT_USER"): default_credentials}
+    """ Obselete
     def _get_default_credentials(self):
-        if self.default_user != 'hal':
-            user_id = self.slack_client.get_id_from_user_name(self.default_user)
-            user_dm = self.slack_client.get_dm_id_from_user_id(user_id)
+        credfile = open('credfile', 'rb').read()
+        try:
+            raw_string = self.crypt.decrypt(credfile)
+        except InvalidToken:
+            logger.error("Invalid decryption key given")
+            return None
+        cred_json = json.loads(raw_string.decode('ascii'))
+        credentials = client.OAuth2Credentials.from_json(cred_json)
 
-        else:
-            credfile = open('credfile', 'rb').read()
-
-            try:
-                raw_string = self.crypt.decrypt(credfile)
-            except InvalidToken:
-                logger.error("Invalid decryption key given")
-                return None
-
-            cred_json = json.loads(raw_string.decode('ascii'))
-            credentials = client.OAuth2Credentials.from_json(cred_json)
-
-            return credentials
+        return credentials
+    """
 
     def get_credential(self, event, state_id, user=None):
         if user is None:

@@ -9,6 +9,7 @@ Hal is hosted on BeepBoop. Visit [Beep Boop](https://beepboophq.com/docs/article
 I hear you want to contribute to hal.  Awesome.  Here are some guidelines.
 
 ### Assumptions
+
 We assume you understand the following:
 - How to develop in Python2 (we have a slack channel for this)
 - How to interact with GitHub. 
@@ -44,7 +45,6 @@ Here are some initial set up steps
 If you want to add or change an event that the bot responds (e.g. when the bot is mentioned, when the bot joins a channel, when a user types a message, etc.), you can modify the `_handle_by_type` method in `event_handler.py`.
 
 The `slack_clients.py` module provides a facade of two different Slack API clients which can be enriched to access data from Slack that is needed by your Bot:
-
 1. [slackclient](https://github.com/slackhq/python-slackclient) - Realtime Messaging (RTM) API to Slack via a websocket connection.
 2. [slacker](https://github.com/os/slacker) - Web API to Slack via RESTful methods.
 
@@ -82,7 +82,7 @@ To start your local version of hal, run the following steps from a command promp
 - set CALLBACK_URI=[YOUR PUBLIC URI]:5555 (This is where Google sends the oauth callback, must match the callback uri specified above)
 - set FERNET_KEY=[encryption key] (This is the key you got when you created the encrypted oauth credentials. It is also used to encrypt and decrypt state as sent to Google)
 - set BEEPBOOP_TOKEN=[whatever you want] (There is a check in the code which requires a beepboop token, but it is only useful in prod)
-- set DEFAULT_USER=['hal' in prod, your slack user id in testing](defines the default user for unauthenticated google queries)
+- set DEFAULT_USER=['hal' in prod, your real name in slack in testing](defines the default user for unauthenticated google queries)
 - python ./bot/app.py
 
 Things are looking good if the console prints something like:
