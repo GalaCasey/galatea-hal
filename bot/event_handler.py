@@ -1,6 +1,5 @@
 import json
 import logging
-import zmq
 
 from gala_wit import GalaWit
 from intenthandlers.utils import get_highest_confidence_entity
@@ -43,12 +42,9 @@ conversation_intent_types = {
 
 
 class RtmEventHandler(object):
-    def __init__(self, slack_clients, msg_writer, context):
-        self.flask_receiver = context.socket(zmq.PULL)
-        self.flask_receiver.bind("inproc://flask")
-        self.poller = zmq.Poller()
-        self.poller.register(self.flask_receiver, zmq.POLLIN)
-
+    def __init__(self, slack_clients, msg_writer, event_processing_q, state_updating_q):
+        self.state_updating_q = state_updating_q  # this q holds objects which update some internal state
+        self.event_processing_q = event_processing_q  # this q holds objects representing events to act upon
         self.clients = slack_clients
         self.msg_writer = msg_writer
         self.wit_client = GalaWit()
@@ -70,8 +66,11 @@ class RtmEventHandler(object):
             'send-email': (send_email, "hello person@galatea-associates.com"),
         }
 
-    def handle(self, event):
+    def state_check(self):
+        if not self.state_updating_q.empty():
+            self._process_q()
 
+    def handle(self, event):
         if 'type' in event:
             self._handle_by_type(event['type'], event)
 
@@ -90,10 +89,6 @@ class RtmEventHandler(object):
         elif event_type == 'group_joined':
             # you joined a private group
             self.msg_writer.say_hi(event['channel'], event.get('user', ""))
-        elif event_type == 'pong':
-            # I am not certain if there is a better way to do this check
-            if len(self.wait_states) > 0:
-                self._check_flask()
         else:
             pass
 
@@ -112,7 +107,7 @@ class RtmEventHandler(object):
         logger.info("Asking wit to interpret| {}".format(msg_txt))
         wit_resp = self.wit_client.interpret(msg_txt)
 
-        # Add username and channel name to the event object
+        # Add username and channel name, user dm, and cleaned text to the event object
         user_name = self.clients.get_user_name_from_id(event['user'])
         if is_direct_message(channel_id):
             channel_name = "Direct Message"
@@ -140,46 +135,67 @@ class RtmEventHandler(object):
                 event.update({"conversation": match})
 
         if intent_value in self.intents:
-            # how to pass credentials to functions?
-            self._handle_state_change(self.intents[intent_value][0](self.msg_writer,
-                                                                    event,
-                                                                    wit_resp['entities'],
-                                                                    self.credentials))
+            t = {
+                'intent': self.intents[intent_value][0],
+                'msg_writer': self.msg_writer,
+                'event': event,
+                'wit_entities': wit_resp['entities'],
+                'credentials': self.credentials,
+                'state_q': self.state_updating_q
+            }
+            self.event_processing_q.put(t)
+
         else:
             raise ReferenceError("No function found to handle intent {}".format(intent_value))
 
-    def _check_flask(self):
+    def _process_q(self):
+        state = self.state_updating_q.get()
+        if state['type'] == 'flask_response':
+            self._check_flask(state)
+        elif state['type'] == 'state_update':
+            self._handle_state_change(state)
+
+    def _check_flask(self, auth_json):
         """
         _check_flask checks to see if there are any messages from the flask thread. If there are, it processes them
         by finishing the authentication flow, and then resuming the interrupted user command.
         :return: None
         """
-        socks = dict(self.poller.poll(1))  # Checks for 1 ms
-        if self.flask_receiver in socks:
-            auth_json = self.flask_receiver.recv_json()
+        auth_code = auth_json.get('auth_code')
+        encrypted_state = auth_json.get('encrypted_state')
 
-            auth_code = auth_json.get('auth_code')
-            encrypted_state = auth_json.get('encrypted_state')
+        flow = client.OAuth2WebServerFlow(client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
+                                          client_secret=os.getenv("GOOGLE_CLIENT_SECRET", ""),
+                                          scope=SCOPES,
+                                          redirect_uri=os.getenv("CALLBACK_URI", ""))
+        credentials = flow.step2_exchange(auth_code)
+        state_id = self.credentials.add_credential_return_state_id(credentials, encrypted_state)
+        logger.info('state id {}'.format(state_id))
+        logger.info('waitstates {}'.format(self.wait_states))
+        state = self.wait_states.get(state_id)
+        logger.info('state {}'.format(state))
 
-            flow = client.OAuth2WebServerFlow(client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
-                                              client_secret=os.getenv("GOOGLE_CLIENT_SECRET", ""),
-                                              scope=SCOPES,
-                                              redirect_uri=os.getenv("CALLBACK_URI", ""))
-            credentials = flow.step2_exchange(auth_code)
-            state_id = self.credentials.add_credential_return_state_id(credentials, encrypted_state)
-            state = self.wait_states.get(state_id)
-            self._handle_state_change(self.intents[state.get_intent_value()][0](self.msg_writer,
-                                                                                state.get_event(),
-                                                                                state.get_wit_entities(),
-                                                                                state.get_credentials()))
-            self.wait_states.pop(state_id)
+        if state is None:
+            raise KeyError
 
-    def _handle_state_change(self, state):
+        t = {
+            'intent': self.intents[state.get_intent_value()][0],
+            'msg_writer': self.msg_writer,
+            'event': state.get_event(),
+            'wit_entities': state.get_wit_entities(),
+            'credentials': state.get_credentials(),
+            'state_q': self.state_updating_q
+        }
+        self.event_processing_q.put(t)
+        self.wait_states.pop(state_id)
+
+    def _handle_state_change(self, state_json):
         """
-        :param state: The state returned by the intent handling function
+        :param state_json: The state returned by the intent handling function
         Updates the state dicts based on they type of the state returned.
         :return: None
         """
+        state = state_json['state']
         if isinstance(state, ConversationState):
             self._conversations_update(state)
         elif isinstance(state, WaitState):
@@ -235,7 +251,7 @@ class RtmEventHandler(object):
 
     def _conversations_update(self, conversation):
         """
-        :param conversation: A Conversation that needs to be updated or added to, or removed from self.conversations
+        :param conversation: A Conversation that needs to be updated, added to, or removed from self.conversations
         _conversations_update adds to, updates, or removes from self.conversations based on the id and the state of the
         passed conversation
         :return: None

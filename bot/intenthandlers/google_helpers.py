@@ -5,8 +5,6 @@ import httplib2
 import base64
 import re
 import uuid
-import copy
-import requests
 from uuid import uuid4
 from email.mime.text import MIMEText
 from state import WaitState
@@ -40,21 +38,6 @@ class GoogleCredentials(object):
         except ValueError:
             logger.error("Null decryption key given")
         self._credentials_dict = {}
-        # default_credentials = self._get_default_credentials()
-        # self._credentials_dict = {os.getenv("DEFAULT_USER"): default_credentials}
-    """ Obselete
-    def _get_default_credentials(self):
-        credfile = open('credfile', 'rb').read()
-        try:
-            raw_string = self.crypt.decrypt(credfile)
-        except InvalidToken:
-            logger.error("Invalid decryption key given")
-            return None
-        cred_json = json.loads(raw_string.decode('ascii'))
-        credentials = client.OAuth2Credentials.from_json(cred_json)
-
-        return credentials
-    """
 
     def get_credential(self, event, state_id, user=None):
         if user is None:
@@ -63,7 +46,7 @@ class GoogleCredentials(object):
             if self._credentials_dict[user].access_token_expired:
                 raise GoogleAccessError
             return self._credentials_dict[user]
-        except KeyError or GoogleAccessError as error:
+        except KeyError or GoogleAccessError:
             # create and encrypt state
             state = {'state_id': str(state_id.hex), 'user_id': user}
             encrypted_state = self.crypt.encrypt(json.dumps(state).encode('utf-8'))
@@ -74,8 +57,8 @@ class GoogleCredentials(object):
                                               scope=SCOPES,
                                               redirect_uri=os.getenv("CALLBACK_URI", ""))
             flow.params['access_type'] = 'offline'
-            if isinstance(error, GoogleAccessError):
-                flow.params['approval_prompt'] = 'force'
+            flow.params['prompt'] = 'consent'
+            logger.info("flow {}".format(flow.params))
             auth_uri = flow.step1_get_authorize_url(state=encrypted_state)
             if not is_direct_message(event['channel']):
                 self.msg_writer.send_message(event['channel'],
@@ -135,44 +118,6 @@ def send_email(msg_writer, event, wit_entities, credentials):
     message_encoded = {'raw': base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode('utf-8')}
 
     service.users().messages().send(userId="me", body=message_encoded).execute()
-
-
-def google_query(function, parameters, event):
-    """
-    :param function: Name of the function to be called in google scripts
-    :param parameters: parameters of the function
-    :param event: Event object containing information about the slack event
-    This function should not be used. Currently used by galastats.py, but that should be upgraded, and this function
-    deleted
-    :return: The text of the response provided by google, in json format
-    """
-
-    target_url = os.getenv("SCRIPTS_URL", "")
-    token = os.getenv("GOOGLE_SLACK_TOKEN", "")
-    data = copy.deepcopy(parameters)
-    try:
-        channel_name = event['channel_name']['name']
-    except TypeError:
-        channel_name = event['channel_name']
-
-    data.update({
-        'function': function,
-        'token': token,
-        'user_name': event['user_name']['profile']['real_name'],
-        'user_id': event['user'],
-        'channel_name': channel_name,
-        'channel_id': event['channel'],
-        'action': 'hal'
-    })
-    logger.info("data is {}".format(data))
-    resp = requests.get(target_url, data)
-
-    if resp.status_code == 200:
-        resp_json = json.loads(resp.text)
-        logger.info("resp text {}, json {}".format(resp.text, resp_json))
-        return resp_json
-    else:
-        raise GoogleAccessError(resp.status_code)
 
 
 class GoogleAccessError(Exception):

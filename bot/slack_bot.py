@@ -1,7 +1,6 @@
 import time
 import logging
 import traceback
-
 from slack_clients import SlackClients
 from messenger import Messenger
 from event_handler import RtmEventHandler
@@ -14,13 +13,14 @@ def spawn_bot():
 
 
 class SlackBot(object):
-    def __init__(self, zmq_context, token=None, slack_clients=SlackClients):  # added slack_clients=SlackClients to allow for mocking
+    def __init__(self, state_updating_q, event_processing_q, token=None, slack_clients=SlackClients):
         """Creates Slacker Web and RTM clients with API Bot User token.
 
         Args:
             token (str): Slack API Bot User token (for development token set in env)
         """
-        self.zmq_context = zmq_context
+        self.event_processing_q = event_processing_q
+        self.state_updating_q = state_updating_q
         self.last_ping = 0
         self.keep_running = True
         if token is not None:
@@ -44,12 +44,13 @@ class SlackBot(object):
                 self.clients.rtm.server.username,
                 self.clients.rtm.server.login_data['team']['name'],
                 self.clients.rtm.server.domain))
-
             msg_writer = messenger(self.clients)
-            event_handler = rtmEventHandler(self.clients, msg_writer, self.zmq_context)
+
+            event_handler = rtmEventHandler(self.clients, msg_writer, self.event_processing_q, self.state_updating_q)
 
             while self.keep_running:
                 for event in self.clients.rtm.rtm_read():
+                    event_handler.state_check()
                     try:
                         event_handler.handle(event)
                     except:

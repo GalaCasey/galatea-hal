@@ -3,7 +3,6 @@ import logging
 import re
 import time
 import json
-import os
 from intenthandlers.utils import get_highest_confidence_entity
 from intenthandlers.utils import memoized
 from slacker import Slacker

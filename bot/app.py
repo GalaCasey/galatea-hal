@@ -2,8 +2,8 @@
 
 import logging
 import os
-import zmq
-from threads import FlaskThread
+from threads import FlaskThread, WorkerPoolThread
+from queue import Queue
 
 from beepboop import resourcer
 from beepboop import bot_manager
@@ -30,11 +30,14 @@ def main():
         res = resourcer.Resourcer(botManager)
         res.start()
     else:
-        context = zmq.Context()
-        flask_thread = FlaskThread(context)
+        state_updating_q = Queue()
+        flask_thread = FlaskThread(state_updating_q)
         flask_thread.start()
+        event_processing_q = Queue()
+        intent_runner_pool = WorkerPoolThread(event_processing_q, state_updating_q)
+        intent_runner_pool.start()
         # only want to run a single instance of the bot in dev mode
-        bot = SlackBot(context, slack_token)
+        bot = SlackBot(state_updating_q, event_processing_q, slack_token)
         bot.start({})
 
 

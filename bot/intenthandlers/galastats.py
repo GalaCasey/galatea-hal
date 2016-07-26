@@ -4,7 +4,6 @@ from uuid import uuid4
 from state import WaitState
 from apiclient import discovery
 from intenthandlers.utils import get_highest_confidence_entity, CallOnce
-from intenthandlers.google_helpers import google_query
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,6 @@ def count_galateans(msg_writer, event, wit_entities, credentials, ghce=get_highe
                           wit_entities=wit_entities, credentials=credentials)
         return state
     location_totals = get_galateans(current_creds)
-    logger.info(location_totals)
     text = "*Office | Count*"
     if normalized_loc == "all":
         for office in location_totals:
