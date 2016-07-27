@@ -63,7 +63,7 @@ class FlaskThread(threading.Thread):
                                            'auth_code': auth_code,
                                            'encrypted_state': encrypted_state})
 
-            return "Authentication Successful"
+            return "<H1>Authentication Successful</H1>"
             # Useful to keep flask from breaking, despite no need for a response to google
 
         # This line must be the last line, or functions will not be defined before the server starts, resulting in 404s
@@ -77,7 +77,6 @@ class ValidationThread(threading.Thread):
         threading.Thread.__init__(self, name=name)
 
     def run(self):
-        # Needs a heartbeat
         while True:
             try:  # This try except is used in order to use the timeout on a queue get as a heartbeat timer
                 event = self.validation_q.get(timeout=5)
@@ -117,7 +116,6 @@ class WorkerPoolThread(threading.Thread):
         self.state_q.put({'type': 'state_update', 'state': state})
 
     def run(self):
-        # Needs a heartbeat?
         with concurrent.futures.ThreadPoolExecutor() as executor:
             while True:
                 if not self._stopevent.is_set():

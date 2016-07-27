@@ -135,7 +135,7 @@ class SlackClients(object):
             msg_writer.send_message(event['channel'], "I couldn't find anyone named {} to nag".format(user_name_to_nag))
             return
 
-        thread = StoppableThread(msg_writer.send_message, dm, message, delay=30)  # 30 second delay
+        thread = StoppableThread(msg_writer.send_message, dm, message, delay=7200)  # 2 hour repeat delay
         msg_writer.send_message(event['channel'], "Nagging {}".format(user_name_to_nag))
         thread.start()
 

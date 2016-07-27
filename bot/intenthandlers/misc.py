@@ -1,7 +1,6 @@
 from __future__ import print_function
 import logging
 import random
-from time import sleep
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,6 @@ def randomize_options(msg_writer, event, wit_entities, credentials):
 
 
 def flip_coin(msg_writer, event, wit_entities, credentials):
-    sleep(6)
     msg_writer.send_message(event['channel'], "_{}_".format(random.choice(['Heads', 'Tails'])))
 
 

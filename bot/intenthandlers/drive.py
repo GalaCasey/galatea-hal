@@ -17,7 +17,7 @@ def get_google_drive_list(msg_writer, event, wit_entities, credentials):
     :return: None, list of drive files is written to slack channel
     """
     state_id = uuid4()
-    current_creds = credentials.get_credential(event, state_id)
+    current_creds = credentials.get_credential(event, state_id, user=event['user'])
     if current_creds is None:
         state = WaitState(build_uuid=state_id, intent_value='get-google-drive', event=event,
                           wit_entities=wit_entities, credentials=credentials)
@@ -49,7 +49,7 @@ def view_drive_file(msg_writer, event, wit_entities, credentials):
     :return: None, list of drive files with the name specified by wit_entities is written to slack channel
     """
     state_id = uuid4()
-    current_creds = credentials.get_credential(event, state_id)
+    current_creds = credentials.get_credential(event, state_id, user=event['user'])
     if current_creds is None:
         state = WaitState(build_uuid=state_id, intent_value='view-drive-file', event=event,
                           wit_entities=wit_entities, credentials=credentials)
@@ -86,7 +86,7 @@ def create_drive_file(msg_writer, event, wit_entities, credentials):
     to slack channel
     """
     state_id = uuid4()
-    current_creds = credentials.get_credential(event, state_id)
+    current_creds = credentials.get_credential(event, state_id, user=event['user'])
     if current_creds is None:
         state = WaitState(build_uuid=state_id, intent_value='create-drive-file', event=event,
                           wit_entities=wit_entities, credentials=credentials)
@@ -114,7 +114,7 @@ def delete_drive_file(msg_writer, event, wit_entities, credentials):
     to slack channel
     """
     state_id = uuid4()
-    current_creds = credentials.get_credential(event, state_id)
+    current_creds = credentials.get_credential(event, state_id, user=event['user'])
     if current_creds is None:
         state = WaitState(build_uuid=state_id, intent_value='delete-drive-file', event=event,
                           wit_entities=wit_entities, credentials=credentials)
