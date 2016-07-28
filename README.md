@@ -55,7 +55,8 @@ The `intenthandler` package contains the code that handles intents returned by w
 ##### State
 States are currently being preserved in state objects (see state.py). In particular, if you would like to introduce a new type of state, particularly a new type of conversation, please extend State, or ConversationState
 ##### Threads
-If you need a thread, please implement it in threads.py
+If you need a thread, please implement it in threads.py.
+
 In addition, we are also using a threadpool to execute tasks, so Hal can be internally asynchronous and non-blocking
 ##### OAuth 2.0
 OAuth is a complex protocol, and you would be well served reading the many guides online, as well as the Google specific documentation. However, there are a number of small points that are worth mentioning here.
