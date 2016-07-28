@@ -9,6 +9,8 @@ class Messenger(object):
         self.clients = slack_clients
 
     def send_message_with_attachments(self, channel_id, msg, attachments):
+        # Note: With attachments, attatchments must be a list of attachments, even if there is only one attachment
+        # to attach, i.e. attachments=[{'text':'attachment_text'}], or the posting of attachments will fail silently.
         logger.debug('Sending msg: {} to channel: {}'.format(msg, channel_id))
         self.clients.web.chat.post_message(channel_id, msg, attachments=attachments, as_user='true')
 

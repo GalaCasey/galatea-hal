@@ -30,6 +30,7 @@ user_ignore_list = ['USLACKBOT']
 
 # A list of intents which are part of conversations. Could be merged into intents as a separate entry in the tuple
 conversation_intent_types = {
+    # NOTE: none of the functions have been implemented. This is an important TODO for conversation matching!
     'accounts-setup': onboarding_conversation_match,
     'desk-setup': onboarding_conversation_match,
     'phones-setup': onboarding_conversation_match,

@@ -14,6 +14,7 @@ def get_google_drive_list(msg_writer, event, wit_entities, credentials):
     :param msg_writer: writer used to write to the slack channel
     :param event: slack event object
     :param wit_entities: entity object returned by wit API call
+    :param credentials GoogleCredentials object used to authorize requests
     :return: None, list of drive files is written to slack channel
     """
     state_id = uuid4()
@@ -46,6 +47,7 @@ def view_drive_file(msg_writer, event, wit_entities, credentials):
     :param msg_writer: writer used to write to the slack channel
     :param event: slack event object
     :param wit_entities: entity object returned by wit API call
+    :param credentials GoogleCredentials object used to authorize requests
     :return: None, list of drive files with the name specified by wit_entities is written to slack channel
     """
     state_id = uuid4()
@@ -82,6 +84,7 @@ def create_drive_file(msg_writer, event, wit_entities, credentials):
     :param msg_writer: writer used to write to the slack channel
     :param event: slack event object
     :param wit_entities: entity object returned by wit API call
+    :param credentials GoogleCredentials object used to authorize requests
     :return: None, affirmitive message indicating creation of file with name specified by wit_entities is sent
     to slack channel
     """

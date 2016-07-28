@@ -34,7 +34,7 @@ Here are some initial set up steps
 - Make sure that you set one of the authorized redirect URI's to a public web URI, port 5555, that you have access too, i.e. http://place.sample.com:5555
 - Under overview, enable all the api's you'll be using. Currently, that is Gmail and Google Drive.
 - Talk to Raj so we can figure out how best to share the wit app.  Wit used to have a fork feature but not sure that is there anymore.
-
+- If you have problems with this setup, or during dev, don't hesitate to contact John Casey with questions
 
 ### Dev Process
 - Make your changes

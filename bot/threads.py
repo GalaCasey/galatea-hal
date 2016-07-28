@@ -54,6 +54,7 @@ class FlaskThread(threading.Thread):
         def _handle_flask_redirect():
 
             if 'code' not in flask.request.args:
+                # This happens when a user actually clicks 'deny' on the OAuth page
                 if 'error' in flask.request.args:
                     self.state_updating_q.put({'type': 'flask_response',
                                                'error': flask.request.args.get('error'),
