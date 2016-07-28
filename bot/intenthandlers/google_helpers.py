@@ -68,7 +68,7 @@ class GoogleCredentials(object):
                 self.msg_writer.send_message(event['channel'],
                                              "I'll send you the authorization link in a direct message")
             channel = event['user_dm']
-            self.msg_writer.send_message(channel, "Click here to authorize {}".format(auth_uri))
+            self.msg_writer.send_message_with_attachments(channel, "Authorization Link", [{'text': "<{}|Click here to authorize>".format(auth_uri)}])
             return None
 
     # This function feels really janky
@@ -88,6 +88,17 @@ class GoogleCredentials(object):
         state_json = json.loads(raw_string.decode('ascii'))
         user_id = state_json.get('user_id')
         self._credentials_dict.update({user_id: credentials})
+
+        return uuid.UUID(state_json.get('state_id'))
+
+    def return_state_id(self, state):
+        try:
+            raw_string = self.crypt.decrypt(state.encode('utf-8'))
+        except InvalidToken:
+            logger.error("Invalid decryption key given")
+            return
+
+        state_json = json.loads(raw_string.decode('ascii'))
 
         return uuid.UUID(state_json.get('state_id'))
 

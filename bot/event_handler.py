@@ -166,31 +166,35 @@ class RtmEventHandler(object):
         """
         auth_code = auth_json.get('auth_code')
         encrypted_state = auth_json.get('encrypted_state')
+        if auth_code is not None:
 
-        flow = client.OAuth2WebServerFlow(client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
-                                          client_secret=os.getenv("GOOGLE_CLIENT_SECRET", ""),
-                                          scope=SCOPES,
-                                          redirect_uri=os.getenv("CALLBACK_URI", ""))
-        credentials = flow.step2_exchange(auth_code)
-        state_id = self.credentials.add_credential_return_state_id(credentials, encrypted_state)
-        logger.info('state id {}'.format(state_id))
-        logger.info('waitstates {}'.format(self.wait_states))
-        state = self.wait_states.get(state_id)
-        logger.info('state {}'.format(state))
+            flow = client.OAuth2WebServerFlow(client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
+                                              client_secret=os.getenv("GOOGLE_CLIENT_SECRET", ""),
+                                              scope=SCOPES,
+                                              redirect_uri=os.getenv("CALLBACK_URI", ""))
+            credentials = flow.step2_exchange(auth_code)
+            state_id = self.credentials.add_credential_return_state_id(credentials, encrypted_state)
+            logger.info('state id {}'.format(state_id))
+            logger.info('waitstates {}'.format(self.wait_states))
+            state = self.wait_states.get(state_id)
+            logger.info('state {}'.format(state))
 
-        if state is None:
-            raise KeyError
+            if state is None:
+                raise KeyError
 
-        t = {
-            'intent': self.intents[state.get_intent_value()][0],
-            'msg_writer': self.msg_writer,
-            'event': state.get_event(),
-            'wit_entities': state.get_wit_entities(),
-            'credentials': state.get_credentials(),
-            'state_q': self.state_updating_q
-        }
-        self.event_processing_q.put(t)
-        self.wait_states.pop(state_id)
+            t = {
+                'intent': self.intents[state.get_intent_value()][0],
+                'msg_writer': self.msg_writer,
+                'event': state.get_event(),
+                'wit_entities': state.get_wit_entities(),
+                'credentials': state.get_credentials(),
+                'state_q': self.state_updating_q
+            }
+            self.event_processing_q.put(t)
+            self.wait_states.pop(state_id)
+        else:
+            state_id = self.credentials.return_state_id(encrypted_state)
+            self.wait_states.pop(state_id)
 
     def _handle_state_change(self, state_json):
         """

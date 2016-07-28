@@ -54,8 +54,11 @@ class FlaskThread(threading.Thread):
         def _handle_flask_redirect():
 
             if 'code' not in flask.request.args:
-                # This shouldn't happen
-                raise KeyError
+                if 'error' in flask.request.args:
+                    self.state_updating_q.put({'type': 'flask_response',
+                                               'error': flask.request.args.get('error'),
+                                               'encryptied_state': flask.request.args.get('encrypted_state')})
+                    return "<H1>Authentication Failed</H1>"
             else:
                 auth_code = flask.request.args.get('code')
                 encrypted_state = flask.request.args.get('state')

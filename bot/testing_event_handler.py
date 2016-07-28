@@ -7,7 +7,7 @@ from mock import MagicMock
 from wit import Wit
 
 
-from event_handler import RtmEventHandler, intents
+from event_handler import RtmEventHandler
 from messenger import Messenger
 from slack_clients import SlackClients
 
@@ -46,8 +46,8 @@ class TestEventHandler(unittest.TestCase, RtmEventHandler):
     def test_validate_intents(self):
         # schema returns passed data if data is valid
         schema = Schema((types.FunctionType, str))
-        for c in intents:
-            self.assertEqual(schema.validate(intents[c]), intents[c])
+        for c in self.intents:
+            self.assertEqual(schema.validate(self.intents[c]), self.intents[c])
 
     def test_handle_message(self):
         message_text = 'say quote'

@@ -11,7 +11,7 @@ I hear you want to contribute to hal.  Awesome.  Here are some guidelines.
 ### Assumptions
 
 We assume you understand the following:
-- How to develop in Python2 (we have a slack channel for this)
+- How to develop in Python3 (we have a slack channel for this)
 - How to interact with GitHub. 
 - What docker is
 - How REST APIs work. In fact, you should get a copy of postman from the chrome store
