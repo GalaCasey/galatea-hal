@@ -67,6 +67,9 @@ class RtmEventHandler(object):
         }
 
     def state_check(self):
+        """
+        Called regularly by the slack bot. Used to ensure that state is maintained.
+        """
         if not self.state_updating_q.empty():
             self._process_q()
 

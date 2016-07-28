@@ -63,7 +63,10 @@ def count_galateans(msg_writer, event, wit_entities, credentials, ghce=get_highe
 
 @CallOnce
 def get_galateans(current_creds):
-    # This should make an API call.
+    """
+    This function is only actually called once, any subsequent calls will always return the same result
+    :return: an object representing the count of galateans at our various offices
+    """
     http = current_creds.authorize(httplib2.Http())
     discoveryUrl = ('https://sheets.googleapis.com/$discovery/rest?'
                     'version=v4')

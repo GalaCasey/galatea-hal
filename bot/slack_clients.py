@@ -117,6 +117,11 @@ class SlackClients(object):
     # Currently only supports nagging one person
     # TODO: extend to nagging multiple people or a channel, etc.
     def nag_users(self, msg_writer, event, wit_entities, credentials):
+        """
+        Generates a nagging conversation, and begins nagging the individual specified in the event.
+        Closed by nag_response
+        :return: The Nagging conversation
+        """
         user_name_to_nag = get_highest_confidence_entity(wit_entities, 'name')['value']
         if not user_name_to_nag:
             msg_writer.send_message(event['channel'], "I don't know who you want me to nag")
@@ -148,6 +153,10 @@ class SlackClients(object):
         return conversation
 
     def nag_response(self, msg_writer, event, wit_entities, credentials):
+        """
+        Closes a nag conversation and informs the relevant users
+        :return: An updated nagging conversation so the main thread can remove it from the lists of conversations
+        """
         conversation = event.get('conversation')
         if not conversation:
             msg_writer.send_message(event['channel'],

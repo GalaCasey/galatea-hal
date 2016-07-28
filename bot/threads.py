@@ -71,6 +71,10 @@ class FlaskThread(threading.Thread):
 
 
 class ValidationThread(threading.Thread):
+    """
+    A validation thread is used by a worker pool thread to validate that all async requests are completed without
+    timing out, as a timeout would indicate that the thread crashed.
+    """
     def __init__(self, validation_q, q, name='ValidationThread'):
         self.q = q
         self.validation_q = validation_q
@@ -102,6 +106,10 @@ class ValidationThread(threading.Thread):
 
 
 class WorkerPoolThread(threading.Thread):
+    """
+    A worker pool thread contains a threadpool, where the thread submits requests it pulls off the event q. Then,
+    the submissions are verified using the validation thread
+    """
     def __init__(self, event_q, state_q, name='WorkerPoolThread'):
         self.event_q = event_q
         self.state_q = state_q

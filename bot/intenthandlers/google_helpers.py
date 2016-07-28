@@ -40,6 +40,10 @@ class GoogleCredentials(object):
         self._credentials_dict = {}
 
     def get_credential(self, event, state_id, user=None):
+        """
+        Returns either the user's credentials, or starts the credentialing process if no credentials can be found
+        :return: a credentials object, or None if there is no credentials associated with the user
+        """
         if user is None:
             user = self.default_user
         try:
@@ -69,7 +73,12 @@ class GoogleCredentials(object):
 
     # This function feels really janky
     def add_credential_return_state_id(self, credentials, state):
-
+        """
+        :param credentials: an actual credentials object as returned by flow.step2_exchange from the oauth library
+        :param state: An encrypted string representing a slack user ID and a WaitState UUID.
+        NOTE: this has the major, and important side effect, of storing the user's credentials in the credentials dict
+        :return: the UUID representing the WaitState
+        """
         try:
             raw_string = self.crypt.decrypt(state.encode('utf-8'))
         except InvalidToken:
