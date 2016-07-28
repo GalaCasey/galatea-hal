@@ -56,16 +56,16 @@ The `intenthandler` package contains the code that handles intents returned by w
 States are currently being preserved in state objects (see state.py). In particular, if you would like to introduce a new type of state, particularly a new type of conversation, please extend State, or ConversationState
 ##### Threads
 If you need a thread, please implement it in threads.py
+In addition, we are also using a threadpool to execute tasks, so Hal can be internally asynchronous and non-blocking
 ##### OAuth 2.0
 OAuth is a complex protocol, and you would be well served reading the many guides online, as well as the Google specific documentation. However, there are a number of small points that are worth mentioning here.
 - Upon the _first authorization_ of a user, google returns an access token with a refresh token. All further authorizations do not return a refresh token. This can result in 'Invalid grant' errors during testing. The easiest fix during testing is to have the user revoke access in the [Google Security Panel](https://security.google.com/settings/security/permissions). This should not be an issue during prod, as the credentials should be securely stored upon the first authentication (To Be Implemented)
 - When implementing a new method that requires a user authenticate, use the process found in google_helpers.py's send_email function. Generate a new uuid, then try and get the credentials for the user. If the credentials cannot be found,
 create a WaitState based on that uuid, and return it. The RtmEventHandler will take charge of this WaitState, and will resume the method call when authentication is completed.
 - probably is more to say...
-##### ZMQ Messaging
-We are using the ZeroMQ library for sending messages between our threads. Currently this is just to handle messages from our flask endpoint to our message handler, which indicate when OAuth has been completed for a user
+
 ##### cryptography.fernet
-We are useing Fernet for symmetrical encryption to encrypt our state as we pass through google OAuth. In addition, we are using it to encrypt the static Hal credentials.
+We are useing Fernet for symmetrical encryption to encrypt our state as we pass through google OAuth.
 ##### fuzzywuzzy
 Fuzzywuzzy is a fuzzy string matching library, which we are using for google drive lookups to account for slight misspellings of actual file names.
 
